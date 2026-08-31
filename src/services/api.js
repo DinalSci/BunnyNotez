@@ -47,21 +47,25 @@ export const initializeStorage = () => {
 
 // Helper to get configuration
 export const getConfig = () => {
+  const envUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
+  const envTgToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
+  const envTgChatId = import.meta.env.VITE_TELEGRAM_CHAT_ID || '';
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CONFIG);
-    return raw ? JSON.parse(raw) : {
-      apiUrl: '',
-      telegramBotToken: '',
-      telegramChatId: '',
-      isLiveMode: false,
-      autoTelegramAlerts: true
+    const parsed = raw ? JSON.parse(raw) : {};
+    return {
+      apiUrl: parsed.apiUrl || envUrl,
+      telegramBotToken: parsed.telegramBotToken || envTgToken,
+      telegramChatId: parsed.telegramChatId || envTgChatId,
+      isLiveMode: parsed.isLiveMode !== undefined ? parsed.isLiveMode : Boolean(parsed.apiUrl || envUrl),
+      autoTelegramAlerts: parsed.autoTelegramAlerts !== undefined ? parsed.autoTelegramAlerts : true
     };
   } catch {
     return {
-      apiUrl: '',
-      telegramBotToken: '',
-      telegramChatId: '',
-      isLiveMode: false,
+      apiUrl: envUrl,
+      telegramBotToken: envTgToken,
+      telegramChatId: envTgChatId,
+      isLiveMode: Boolean(envUrl),
       autoTelegramAlerts: true
     };
   }

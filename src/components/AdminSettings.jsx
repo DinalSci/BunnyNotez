@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api, getConfig, saveConfig } from '../services/api';
+import { api, getConfig, saveConfig, factoryReset } from '../services/api';
 import { 
   Settings, 
   Send, 
@@ -13,7 +13,9 @@ import {
   Link2,
   Lock,
   FolderOpen,
-  HelpCircle
+  HelpCircle,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -44,6 +46,10 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminSubject, setAdminSubject] = useState('Biology');
   const [adminMsg, setAdminMsg] = useState('');
+
+  // Factory reset confirmation
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [resetInput, setResetInput] = useState('');
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -457,6 +463,72 @@ export const AdminSettings = ({ admins, onRefresh }) => {
           </div>
         </div>
 
+      </div>
+
+      {/* ⚠️ Danger Zone — Factory Reset */}
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border-2 border-rose-200/80 bg-rose-50/30 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-rose-100 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-rose-600" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-rose-900">Danger Zone — Factory Reset</h3>
+            <p className="text-xs text-rose-600 mt-0.5">
+              සිසු accounts, admin accounts, papers, marks, submissions ඔක්කොම erase කරනවා. Config (Drive, Telegram) preserved.
+            </p>
+          </div>
+        </div>
+
+        {!resetConfirm ? (
+          <button
+            type="button"
+            onClick={() => setResetConfirm(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border-2 border-rose-300 hover:bg-rose-50 text-rose-700 font-bold text-xs rounded-2xl transition"
+          >
+            <Trash2 className="w-4 h-4" />
+            Reset All Data (Clean Slate)
+          </button>
+        ) : (
+          <div className="space-y-3 p-4 bg-white/90 border border-rose-300 rounded-2xl">
+            <p className="text-xs font-bold text-rose-800">
+              ⚠️ සිසු data, admin accounts, papers, marks ඔක්කොම permanently delete වේ!
+              <br />
+              තහවුරු කිරීමට පහතින් <code className="bg-rose-100 px-1 rounded">RESET</code> ලෙස type කරන්න:
+            </p>
+            <input
+              type="text"
+              placeholder="RESET"
+              value={resetInput}
+              onChange={(e) => setResetInput(e.target.value)}
+              className="w-full p-2.5 rounded-xl border-2 border-rose-200 focus:border-rose-500 text-sm font-mono font-bold text-rose-900 outline-none bg-rose-50"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (resetInput.trim().toUpperCase() === 'RESET') {
+                    factoryReset();
+                    setResetConfirm(false);
+                    setResetInput('');
+                    onRefresh();
+                    window.location.reload();
+                  }
+                }}
+                disabled={resetInput.trim().toUpperCase() !== 'RESET'}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition"
+              >
+                ✅ Confirm Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => { setResetConfirm(false); setResetInput(''); }}
+                className="px-5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

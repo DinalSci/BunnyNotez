@@ -286,6 +286,8 @@ export const AuthModal = () => {
               </div>
             </div>
 
+
+
             {/* Submit Button */}
             <button
               type="submit"

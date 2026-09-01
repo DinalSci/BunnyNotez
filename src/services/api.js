@@ -31,7 +31,17 @@ export const initializeStorage = () => {
     currentAdmins = [];
   }
 
-  // Ensure owner and initial subject admins exist
+  // Remove old hardcoded demo accounts that should no longer exist
+  const DEMO_ACCOUNTS_TO_REMOVE = [
+    'bio.admin@bunnynotes.com',
+    'chem.admin@bunnynotes.com',
+    'phy.admin@bunnynotes.com'
+  ];
+  currentAdmins = currentAdmins.filter(a =>
+    !DEMO_ACCOUNTS_TO_REMOVE.includes(a.email.toLowerCase())
+  );
+
+  // Ensure owner account always exists
   INITIAL_ADMINS.forEach(initAdm => {
     const exists = currentAdmins.some(a => 
       a.email.toLowerCase() === initAdm.email.toLowerCase() || 
@@ -66,6 +76,31 @@ export const initializeStorage = () => {
       autoTelegramAlerts: true
     }));
   }
+};
+
+/**
+ * Factory Reset — wipes ALL data from localStorage.
+ * Config (API URL, Telegram, Drive Folder IDs) is preserved.
+ * Only the Owner account is kept. All students, admins, papers, marks, submissions are cleared.
+ */
+export const factoryReset = () => {
+  // Preserve existing cloud config so owner doesn't have to re-enter it
+  const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
+
+  // Wipe all keys
+  Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+
+  // Restore config
+  if (savedConfig) {
+    localStorage.setItem(STORAGE_KEYS.CONFIG, savedConfig);
+  }
+
+  // Re-init: only owner account, empty everything else
+  localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(INITIAL_ADMINS)); // owner only
+  localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify([]));
+  localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify([]));
 };
 
 export const getConfig = () => {

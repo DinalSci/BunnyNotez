@@ -3,7 +3,7 @@
 // Empty initial students by default (starts clean)
 export const INITIAL_STUDENTS = [];
 
-// Default System Accounts: 1 Owner (Super Admin) and Subject Admins
+// Default System Accounts: Owner only — Subject Admins added via Owner Settings
 export const INITIAL_ADMINS = [
   {
     admin_id: 'OWN001',
@@ -12,7 +12,7 @@ export const INITIAL_ADMINS = [
     password: 'owner123',
     role: 'owner',
     subject: 'All'
-  },
+  }
 ];
 
 export const INITIAL_PAPERS = [];

@@ -15,34 +15,50 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export const AdminMarksManager = ({ students, papers, marks, submissions, onRefresh }) => {
+export const AdminMarksManager = ({ students, papers, marks, submissions, currentAdmin, onRefresh }) => {
+  const isOwner = currentAdmin?.role === 'owner' || currentAdmin?.subject === 'All';
+  const adminSubject = currentAdmin?.subject || 'Biology';
+
   const [selectedIndex, setSelectedIndex] = useState(students[0]?.index_no || '');
-  const [selectedSubject, setSelectedSubject] = useState('Biology');
+  const [selectedSubject, setSelectedSubject] = useState(isOwner ? 'Biology' : adminSubject);
   const [selectedPaperId, setSelectedPaperId] = useState(papers[0]?.id || '');
   const [score, setScore] = useState('');
   const [markedPaperUrl, setMarkedPaperUrl] = useState('');
+  const [markedPdfFile, setMarkedPdfFile] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const currentStudent = students.find(s => s.index_no === selectedIndex);
   const currentPaper = papers.find(p => p.id === selectedPaperId);
   const filteredPapers = papers.filter(p => p.subject.toLowerCase() === selectedSubject.toLowerCase());
 
-  // Submissions pending marking
-  const pendingSubmissions = submissions.filter(s => s.status === 'Pending Marking');
+  // Submissions pending marking for this admin's subject
+  const pendingSubmissions = submissions.filter(s => {
+    const isPending = s.status === 'Pending Marking';
+    if (isOwner) return isPending;
+    return isPending && s.subject.toLowerCase() === adminSubject.toLowerCase();
+  });
 
   const handleQuickEvaluateSubmission = (sub) => {
     setSelectedIndex(sub.index_no);
     setSelectedSubject(sub.subject);
     setSelectedPaperId(sub.paper_id);
     setScore('');
-    setFeedback(`Good submission for ${sub.paper_name}.`);
-    setMarkedPaperUrl('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf');
+    setFeedback(`Evaluation for ${sub.paper_name}.`);
+    setMarkedPaperUrl('');
+    setMarkedPdfFile(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSaveMark = (e) => {
+  const handleMarkedPdfChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setMarkedPdfFile(e.target.files[0]);
+    }
+  };
+
+  const handleSaveMark = async (e) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -57,28 +73,49 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
       return;
     }
 
-    api.saveMark({
-      index_no: selectedIndex,
-      student_name: currentStudent.name,
-      subject: selectedSubject,
-      paper_id: selectedPaperId,
-      paper_name: currentPaper.paper_name,
-      score: Number(score),
-      marked_paper_url: markedPaperUrl.trim(),
-      feedback: feedback.trim()
-    });
+    setLoading(true);
 
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 }
-    });
+    try {
+      let finalMarkedUrl = markedPaperUrl.trim();
 
-    setSuccessMsg(`Marks & Marked PDF successfully updated for ${currentStudent.name} (${selectedIndex})!`);
-    setScore('');
-    setFeedback('');
-    setMarkedPaperUrl('');
-    onRefresh();
+      if (markedPdfFile) {
+        const fileDataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(markedPdfFile);
+        });
+        finalMarkedUrl = fileDataUrl;
+      }
+
+      await api.saveMark({
+        index_no: selectedIndex,
+        student_name: currentStudent.name,
+        subject: isOwner ? selectedSubject : adminSubject,
+        paper_id: selectedPaperId,
+        paper_name: currentPaper.paper_name,
+        score: Number(score),
+        marked_paper_url: finalMarkedUrl,
+        feedback: feedback.trim()
+      });
+
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 }
+      });
+
+      setSuccessMsg(`Marks & Marked PDF successfully saved for ${currentStudent.name} (${selectedIndex})!`);
+      setScore('');
+      setFeedback('');
+      setMarkedPaperUrl('');
+      setMarkedPdfFile(null);
+      onRefresh();
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to save marks.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -140,7 +177,7 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
               <span>Enter Student Marks & Upload Marked PDF</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Grade is automatically calculated. Student will see marked paper link and feedback immediately.
+              Grade (A: 75+, B: 65+, C: 50+, S: 35+) is calculated automatically.
             </p>
           </div>
 
@@ -168,11 +205,15 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
                 onChange={(e) => setSelectedIndex(e.target.value)}
                 className="w-full p-2.5 rounded-2xl glass-input text-sm text-slate-800"
               >
-                {students.map((s) => (
-                  <option key={s.index_no} value={s.index_no}>
-                    {s.name} ({s.index_no}) - {s.batch || '2026 A/L'}
-                  </option>
-                ))}
+                {students.length > 0 ? (
+                  students.map((s) => (
+                    <option key={s.index_no} value={s.index_no}>
+                      {s.name} ({s.index_no}) - {s.batch || '2027 A/L'}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No registered students found</option>
+                )}
               </select>
             </div>
 
@@ -180,19 +221,28 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Subject</label>
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => {
-                    setSelectedSubject(e.target.value);
-                    const subPapers = papers.filter(p => p.subject.toLowerCase() === e.target.value.toLowerCase());
-                    if (subPapers.length > 0) setSelectedPaperId(subPapers[0].id);
-                  }}
-                  className="w-full p-2.5 rounded-2xl glass-input text-sm text-slate-800"
-                >
-                  <option value="Biology">Biology</option>
-                  <option value="Chemistry">Chemistry</option>
-                  <option value="Physics">Physics</option>
-                </select>
+                {isOwner ? (
+                  <select
+                    value={selectedSubject}
+                    onChange={(e) => {
+                      setSelectedSubject(e.target.value);
+                      const subPapers = papers.filter(p => p.subject.toLowerCase() === e.target.value.toLowerCase());
+                      if (subPapers.length > 0) setSelectedPaperId(subPapers[0].id);
+                    }}
+                    className="w-full p-2.5 rounded-2xl glass-input text-sm text-slate-800"
+                  >
+                    <option value="Biology">Biology</option>
+                    <option value="Chemistry">Chemistry</option>
+                    <option value="Physics">Physics</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    disabled
+                    value={adminSubject}
+                    className="w-full p-2.5 rounded-2xl bg-slate-100 border border-slate-200 text-sm text-slate-700 font-bold"
+                  />
+                )}
               </div>
 
               <div>
@@ -202,11 +252,15 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
                   onChange={(e) => setSelectedPaperId(e.target.value)}
                   className="w-full p-2.5 rounded-2xl glass-input text-sm text-slate-800"
                 >
-                  {filteredPapers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.paper_name}
-                    </option>
-                  ))}
+                  {filteredPapers.length > 0 ? (
+                    filteredPapers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.paper_name}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No papers available for this subject</option>
+                  )}
                 </select>
               </div>
             </div>
@@ -228,24 +282,43 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
               </div>
 
               <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between h-[42px] px-4">
-                <span className="text-xs text-slate-500 font-medium">Calculated Grade:</span>
+                <span className="text-xs text-slate-500 font-medium">Grade (50+ is C):</span>
                 <span className={`px-2.5 py-0.5 rounded-xl text-xs font-black border ${getGradeColor(calculateGrade(score))}`}>
                   Grade {calculateGrade(score)}
                 </span>
               </div>
             </div>
 
-            {/* Marked PDF Link (Google Drive) */}
+            {/* Direct Upload Evaluated PDF File */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Marked PDF File Link (Google Drive Shareable Link)
+                Upload Marked / Evaluated PDF
+              </label>
+              <div className="border-2 border-dashed border-slate-200 hover:border-emerald-300 rounded-2xl p-3 text-center bg-slate-50/50">
+                <input
+                  type="file"
+                  id="marked-pdf-file"
+                  accept="application/pdf"
+                  onChange={handleMarkedPdfChange}
+                  className="hidden"
+                />
+                <label htmlFor="marked-pdf-file" className="cursor-pointer text-xs font-semibold text-emerald-700">
+                  {markedPdfFile ? `Selected: ${markedPdfFile.name}` : 'Click to select evaluated marked PDF'}
+                </label>
+              </div>
+            </div>
+
+            {/* Or Shareable Link */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Or Marked PDF Google Drive Link (Optional)
               </label>
               <input
                 type="url"
                 placeholder="https://drive.google.com/file/d/.../view"
                 value={markedPaperUrl}
                 onChange={(e) => setMarkedPaperUrl(e.target.value)}
-                className="w-full p-2.5 rounded-2xl glass-input text-sm text-slate-800 font-mono"
+                className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
               />
             </div>
 
@@ -253,7 +326,7 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Teacher Feedback & Correction Notes</label>
               <textarea
-                placeholder="e.g. Excellent work in structured essay! Review respiration cycle diagrams."
+                placeholder="e.g. Good structured answers! Focus more on Unit 02 definitions."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 rows={2}
@@ -264,38 +337,45 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, onRefr
             {/* Submit Button */}
             <button
               type="submit"
+              disabled={loading}
               className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:to-sky-600 text-white font-bold text-sm shadow-md shadow-emerald-500/20 transition active:scale-98 flex items-center justify-center space-x-2"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Save Marks & Publish Evaluated PDF</span>
+              <span>{loading ? 'Saving...' : 'Save Marks & Publish Evaluated PDF'}</span>
             </button>
           </form>
         </div>
 
-        {/* Quick Instructions & Recent Marks List (5 Cols) */}
+        {/* Recently Recorded Marks List (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
           <div className="glass-panel p-6 rounded-3xl border border-white/80">
             <h4 className="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Recently Recorded Marks</span>
+              <span>Recently Recorded Marks ({marks.length})</span>
             </h4>
 
-            <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-              {marks.slice(0, 6).map((m) => (
-                <div key={m.id} className="p-3 bg-white/80 rounded-2xl border border-slate-100 text-xs flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-slate-800">{m.student_name} <span className="font-mono text-slate-400">({m.index_no})</span></div>
-                    <div className="text-[11px] text-slate-500">{m.subject} • {m.paper_name.slice(0, 25)}...</div>
+            {marks.length > 0 ? (
+              <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                {marks.slice(0, 8).map((m) => (
+                  <div key={m.id} className="p-3 bg-white/80 rounded-2xl border border-slate-100 text-xs flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-800">{m.student_name} <span className="font-mono text-slate-400">({m.index_no})</span></div>
+                      <div className="text-[11px] text-slate-500">{m.subject} • {m.paper_name.slice(0, 20)}...</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-extrabold text-slate-800">{m.score}%</div>
+                      <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${getGradeColor(m.grade)}`}>
+                        Grade {m.grade}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-extrabold text-slate-800">{m.score}%</div>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold ${getGradeColor(m.grade)}`}>
-                      Grade {m.grade}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center text-slate-400 text-xs italic">
+                No marks recorded yet.
+              </div>
+            )}
           </div>
         </div>
 

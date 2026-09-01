@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'bn_current_user'
 };
 
-// Initialize localStorage with default mock data if not already present
+// Initialize localStorage with initial schema
 export const initializeStorage = () => {
   if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
@@ -38,7 +38,9 @@ export const initializeStorage = () => {
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify({
       apiUrl: '',
       telegramBotToken: '',
-      telegramChatId: '',
+      telegramBioChatId: '',
+      telegramChemChatId: '',
+      telegramPhyChatId: '',
       isLiveMode: false,
       autoTelegramAlerts: true
     }));
@@ -49,14 +51,19 @@ export const initializeStorage = () => {
 export const getConfig = () => {
   const envUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
   const envTgToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
-  const envTgChatId = import.meta.env.VITE_TELEGRAM_CHAT_ID || '';
+  const envBioChat = import.meta.env.VITE_TELEGRAM_BIO_CHAT_ID || '';
+  const envChemChat = import.meta.env.VITE_TELEGRAM_CHEM_CHAT_ID || '';
+  const envPhyChat = import.meta.env.VITE_TELEGRAM_PHY_CHAT_ID || '';
+
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const parsed = raw ? JSON.parse(raw) : {};
     return {
       apiUrl: parsed.apiUrl || envUrl,
       telegramBotToken: parsed.telegramBotToken || envTgToken,
-      telegramChatId: parsed.telegramChatId || envTgChatId,
+      telegramBioChatId: parsed.telegramBioChatId || envBioChat,
+      telegramChemChatId: parsed.telegramChemChatId || envChemChat,
+      telegramPhyChatId: parsed.telegramPhyChatId || envPhyChat,
       isLiveMode: parsed.isLiveMode !== undefined ? parsed.isLiveMode : Boolean(parsed.apiUrl || envUrl),
       autoTelegramAlerts: parsed.autoTelegramAlerts !== undefined ? parsed.autoTelegramAlerts : true
     };
@@ -64,7 +71,9 @@ export const getConfig = () => {
     return {
       apiUrl: envUrl,
       telegramBotToken: envTgToken,
-      telegramChatId: envTgChatId,
+      telegramBioChatId: envBioChat,
+      telegramChemChatId: envChemChat,
+      telegramPhyChatId: envPhyChat,
       isLiveMode: Boolean(envUrl),
       autoTelegramAlerts: true
     };
@@ -101,7 +110,7 @@ export const getNextIndexNumber = () => {
 // API Service Class
 export const api = {
   // Authentication: Register Student
-  async registerStudent({ name, email, password, phone, batch = '2026 A/L' }) {
+  async registerStudent({ name, email, password, phone, batch = '2027 A/L' }) {
     const config = getConfig();
 
     // If Live Apps Script mode is configured
@@ -121,7 +130,6 @@ export const api = {
         });
         const result = await response.json();
         if (result.success) {
-          // sync locally
           const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
           students.push(result.user);
           localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
@@ -133,7 +141,7 @@ export const api = {
       }
     }
 
-    // Local / Mock Mode
+    // Local / Offline Mode
     const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
     const existing = students.find(s => s.email.toLowerCase() === email.toLowerCase());
     if (existing) {
@@ -163,7 +171,7 @@ export const api = {
     };
   },
 
-  // Authentication: Login (Student or Admin)
+  // Authentication: Login (Student, Admin, or Owner)
   async login({ identifier, password, role }) {
     const config = getConfig();
     const cleanId = identifier.trim().toLowerCase();
@@ -192,28 +200,27 @@ export const api = {
       }
     }
 
-    // Local / Mock Mode
-    if (role === 'admin') {
+    // Local / Offline Mode
+    if (role === 'admin' || role === 'owner') {
       const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
       const admin = admins.find(a => 
         (a.email.toLowerCase() === cleanId || a.admin_id.toLowerCase() === cleanId) && 
         a.password === password
       );
       if (!admin) {
-        throw new Error('Invalid Admin email/ID or password.');
+        throw new Error('Invalid Admin/Owner email or password.');
       }
-      const user = { ...admin, role: 'admin' };
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-      return { success: true, user };
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(admin));
+      return { success: true, user: admin };
     } else {
-      // Student login (can login with email or BN index)
+      // Student login
       const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
       const student = students.find(s => 
         (s.email.toLowerCase() === cleanId || s.index_no.toLowerCase() === cleanId) && 
         s.password === password
       );
       if (!student) {
-        throw new Error('Invalid Student Index Number/Email or password.');
+        throw new Error('Invalid Student Index Number / Email or password.');
       }
       const user = { ...student, role: 'student' };
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
@@ -221,7 +228,6 @@ export const api = {
     }
   },
 
-  // Get current logged-in user from storage
   getCurrentUser() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
@@ -235,7 +241,7 @@ export const api = {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
   },
 
-  // Get all data for a specific student
+  // Get student data
   getStudentPortalData(index_no) {
     const marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
     const papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
@@ -244,19 +250,18 @@ export const api = {
     const studentMarks = marks.filter(m => m.index_no === index_no);
     const studentSubmissions = submissions.filter(s => s.index_no === index_no);
 
-    // Group marks by subject & calculate averages
     const subjects = ['Biology', 'Chemistry', 'Physics'];
     const subjectStats = {};
 
     subjects.forEach(sub => {
-      const subMarks = studentMarks.filter(m => m.subject === sub);
+      const subMarks = studentMarks.filter(m => m.subject.toLowerCase() === sub.toLowerCase());
       const scores = subMarks.map(m => Number(m.score) || 0);
       const avgScore = scores.length > 0 
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) 
         : null;
       const currentGrade = avgScore !== null ? calculateGrade(avgScore) : 'N/A';
       
-      const activePaper = papers.find(p => p.subject === sub && p.status === 'active');
+      const activePaper = papers.find(p => p.subject.toLowerCase() === sub.toLowerCase() && p.status === 'active');
       const hasSubmittedActive = activePaper 
         ? studentSubmissions.some(s => s.paper_id === activePaper.id)
         : false;
@@ -280,11 +285,10 @@ export const api = {
     };
   },
 
-  // Submit Answer Paper (Student)
+  // Submit Answer Paper -> Sends to dedicated subject Telegram group
   async submitAnswerPaper({ index_no, student_name, subject, paper_id, paper_name, file, fileDataUrl }) {
     const config = getConfig();
 
-    // Format clean filename: [Subject]_[PaperName]_[Index].pdf
     const cleanPaperName = paper_name.replace(/[^a-zA-Z0-9_-]/g, '_');
     const formattedFileName = `${subject}_${cleanPaperName}_${index_no}.pdf`;
 
@@ -304,7 +308,6 @@ export const api = {
 
     // Save locally
     const submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
-    // replace if already exists or push
     const existingIndex = submissions.findIndex(s => s.index_no === index_no && s.paper_id === paper_id);
     if (existingIndex >= 0) {
       submissions[existingIndex] = submissionRecord;
@@ -313,7 +316,7 @@ export const api = {
     }
     localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(submissions));
 
-    // Dispatch to Live Google Apps Script (if live)
+    // Live Google Apps Script upload
     let liveUploadSuccess = false;
     let liveDriveUrl = '';
     if (config.isLiveMode && config.apiUrl) {
@@ -325,7 +328,8 @@ export const api = {
             action: 'uploadAnswerPaper',
             submission: submissionRecord,
             fileBase64: fileDataUrl ? fileDataUrl.split(',')[1] : null,
-            fileName: formattedFileName
+            fileName: formattedFileName,
+            subject: subject
           })
         });
         const resJson = await response.json();
@@ -338,24 +342,36 @@ export const api = {
       }
     }
 
-    // Send Telegram Notification to Admin Group / Chat
+    // Determine correct Telegram group based on Subject
+    let targetChatId = '';
+    const subLower = subject.toLowerCase();
+    if (subLower === 'biology') {
+      targetChatId = config.telegramBioChatId;
+    } else if (subLower === 'chemistry') {
+      targetChatId = config.telegramChemChatId;
+    } else if (subLower === 'physics') {
+      targetChatId = config.telegramPhyChatId;
+    }
+
+    // Send Telegram Notification to the dedicated subject group
     let telegramSent = false;
-    if (config.telegramBotToken && config.telegramChatId && config.autoTelegramAlerts) {
+    if (config.telegramBotToken && targetChatId && config.autoTelegramAlerts) {
       try {
-        const caption = `🐰 *Bunny Notes - New Paper Submission!* 📄\n\n` +
+        const emoji = subLower === 'biology' ? '🧬' : subLower === 'chemistry' ? '🧪' : '⚛️';
+        const caption = `🐰 *Bunny Notes - New ${subject} Paper Submission!* ${emoji}\n\n` +
           `👤 *Student:* ${student_name} (\`${index_no}\`)\n` +
           `📚 *Subject:* ${subject}\n` +
           `📝 *Paper:* ${paper_name}\n` +
-          `📎 *File:* \`${formattedFileName}\`\n` +
+          `📎 *File Name:* \`${formattedFileName}\`\n` +
           `⏰ *Time:* ${submissionRecord.submitted_at}\n\n` +
-          `🔗 [View in Drive](${liveDriveUrl || 'https://drive.google.com'})`;
+          `🔗 [View File in Google Drive](${liveDriveUrl || 'https://drive.google.com'})`;
 
         const tgUrl = `https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`;
         await fetch(tgUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chat_id: config.telegramChatId,
+            chat_id: targetChatId,
             text: caption,
             parse_mode: 'Markdown'
           })
@@ -375,43 +391,86 @@ export const api = {
     };
   },
 
-  // Admin: Get all portal data
-  getAdminPortalData() {
+  // Admin Data filtered by admin subject (Owner sees everything)
+  getAdminPortalData(adminUser) {
     const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
     const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-    const papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
-    const marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
-    const submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
+    let papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
+    let marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
+    let submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
+
+    const isOwner = adminUser?.role === 'owner' || adminUser?.subject === 'All';
+    const adminSubject = adminUser?.subject;
+
+    if (!isOwner && adminSubject) {
+      papers = papers.filter(p => p.subject.toLowerCase() === adminSubject.toLowerCase());
+      marks = marks.filter(m => m.subject.toLowerCase() === adminSubject.toLowerCase());
+      submissions = submissions.filter(s => s.subject.toLowerCase() === adminSubject.toLowerCase());
+    }
 
     return {
       students,
       admins,
       papers,
       marks,
-      submissions
+      submissions,
+      isOwner
     };
   },
 
-  // Admin: Add or Update Question Paper
-  savePaper(paperData) {
+  // Admin: Add or Update Question Paper (supports direct PDF upload)
+  async savePaper(paperData) {
+    const config = getConfig();
     const papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
+
+    let finalPdfUrl = paperData.pdf_url || '';
+
+    // If file Data URL was provided and live mode is on, upload to Drive
+    if (paperData.fileDataUrl && config.isLiveMode && config.apiUrl) {
+      try {
+        const response = await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'savePaper',
+            ...paperData,
+            fileBase64: paperData.fileDataUrl.split(',')[1],
+            fileName: `${paperData.subject}_${paperData.paper_name.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`
+          })
+        });
+        const res = await response.json();
+        if (res.success && res.drive_url) {
+          finalPdfUrl = res.drive_url;
+        }
+      } catch (err) {
+        console.warn('Live paper upload failed:', err);
+      }
+    }
+
+    if (!finalPdfUrl && paperData.fileDataUrl) {
+      finalPdfUrl = paperData.fileDataUrl;
+    }
+
+    const newPaperRecord = {
+      ...paperData,
+      pdf_url: finalPdfUrl,
+      id: paperData.id || `${paperData.subject.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+      created_at: paperData.created_at || new Date().toISOString().split('T')[0]
+    };
+
     if (paperData.id) {
       const idx = papers.findIndex(p => p.id === paperData.id);
       if (idx >= 0) {
-        papers[idx] = { ...papers[idx], ...paperData };
+        papers[idx] = newPaperRecord;
       } else {
-        papers.unshift(paperData);
+        papers.unshift(newPaperRecord);
       }
     } else {
-      const newPaper = {
-        ...paperData,
-        id: `${paperData.subject.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
-        created_at: new Date().toISOString().split('T')[0]
-      };
-      papers.unshift(newPaper);
+      papers.unshift(newPaperRecord);
     }
+
     localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(papers));
-    return { success: true, papers };
+    return { success: true, paper: newPaperRecord };
   },
 
   // Admin: Delete Paper
@@ -422,7 +481,7 @@ export const api = {
     return { success: true, papers };
   },
 
-  // Admin: Add or Update Marks & Upload Marked PDF
+  // Admin: Save Marks & Evaluated PDF
   saveMark({ index_no, student_name, subject, paper_id, paper_name, score, marked_paper_url, feedback }) {
     const marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
     const grade = calculateGrade(score);
@@ -436,7 +495,7 @@ export const api = {
       paper_name,
       score: Number(score),
       grade,
-      marked_paper_url: marked_paper_url || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      marked_paper_url: marked_paper_url || '',
       feedback: feedback || '',
       evaluated_at: new Date().toISOString().split('T')[0]
     };
@@ -449,7 +508,7 @@ export const api = {
     }
     localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(marks));
 
-    // Also update submission status to 'Marked'
+    // Update submission status to 'Marked'
     const submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
     const subIdx = submissions.findIndex(s => s.index_no === index_no && s.paper_id === paper_id);
     if (subIdx >= 0) {
@@ -460,8 +519,8 @@ export const api = {
     return { success: true, mark: markRecord };
   },
 
-  // Admin: Add new admin account
-  createAdmin({ name, email, password, subject = 'All' }) {
+  // Admin: Add new admin account (Owner only)
+  createAdmin({ name, email, password, subject = 'Biology' }) {
     const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
     const existing = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
     if (existing) {
@@ -480,13 +539,13 @@ export const api = {
     return { success: true, admin: newAdmin };
   },
 
-  // Send Test Telegram Alert
-  async testTelegram(botToken, chatId) {
+  // Send Test Telegram Alert for specific subject group
+  async testTelegramGroup(botToken, chatId, subjectName = 'General') {
     if (!botToken || !chatId) {
       throw new Error('Please enter both Telegram Bot Token and Chat ID.');
     }
-    const text = `🐰 *Bunny Notes Connected Successfully!* 🚀\n\n` +
-      `Your Telegram bot is now ready to receive student paper submissions and automated alerts in real-time.`;
+    const text = `🐰 *Bunny Notes ${subjectName} Group Connected!* 🚀\n\n` +
+      `Submissions for *${subjectName}* will now arrive in this Telegram group in real-time.`;
     const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
     const response = await fetch(url, {
       method: 'POST',
@@ -499,7 +558,7 @@ export const api = {
     });
     const result = await response.json();
     if (!result.ok) {
-      throw new Error(result.description || 'Failed to send Telegram message. Please check token & chat ID.');
+      throw new Error(result.description || 'Failed to send Telegram message. Check Token & Chat ID.');
     }
     return { success: true, result };
   }

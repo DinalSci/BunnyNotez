@@ -27,7 +27,7 @@ export const AuthModal = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [batch, setBatch] = useState('2026 A/L');
+  const [batch, setBatch] = useState('2027 A/L');
   const [showPassword, setShowPassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -72,18 +72,10 @@ export const AuthModal = () => {
         await login(emailOrIndex.trim(), password, role);
       }
     } catch (err) {
-      setError(err.message || 'Authentication error. Please try again.');
+      setError(err.message || 'Authentication error. Please check your credentials.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = (identifier, pass, selectedRole) => {
-    setRole(selectedRole);
-    setEmailOrIndex(identifier);
-    setPassword(pass);
-    setIsRegister(false);
-    setError('');
   };
 
   return (
@@ -136,7 +128,7 @@ export const AuthModal = () => {
                 }`}
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Admin Login</span>
+                <span>Admin / Owner</span>
               </button>
             </div>
           )}
@@ -144,7 +136,7 @@ export const AuthModal = () => {
           {/* Form Header */}
           <div className="mb-5">
             <h2 className="text-xl font-bold text-slate-800">
-              {isRegister ? 'Student Registration' : role === 'student' ? 'Student Sign In' : 'Admin Sign In'}
+              {isRegister ? 'Student Registration' : role === 'student' ? 'Student Sign In' : 'Admin & Owner Sign In'}
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {isRegister 
@@ -180,7 +172,7 @@ export const AuthModal = () => {
                     <Sparkles className="w-4 h-4 text-emerald-600 animate-spin" />
                     <div>
                       <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider">Your Assigned Index</div>
-                      <div className="text-xs text-emerald-600">Generated on submit</div>
+                      <div className="text-xs text-emerald-600">Generated automatically on register</div>
                     </div>
                   </div>
                   <span className="font-mono text-base font-extrabold px-3 py-1 bg-emerald-500 text-white rounded-xl shadow-sm">
@@ -211,7 +203,7 @@ export const AuthModal = () => {
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       type="email"
-                      placeholder="e.g. kasun@gmail.com"
+                      placeholder="e.g. student@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -220,7 +212,7 @@ export const AuthModal = () => {
                   </div>
                 </div>
 
-                {/* Phone & Batch Grid */}
+                {/* Phone & Batch Grid (2027 A/L to 2029 A/L) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp No</label>
@@ -243,9 +235,9 @@ export const AuthModal = () => {
                       onChange={(e) => setBatch(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-2xl glass-input text-sm text-slate-800"
                     >
-                      <option value="2025 A/L">2025 A/L</option>
-                      <option value="2026 A/L">2026 A/L</option>
                       <option value="2027 A/L">2027 A/L</option>
+                      <option value="2028 A/L">2028 A/L</option>
+                      <option value="2029 A/L">2029 A/L</option>
                     </select>
                   </div>
                 </div>
@@ -255,7 +247,7 @@ export const AuthModal = () => {
             {!isRegister && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {role === 'student' ? 'Student Index (e.g. BN001) or Email' : 'Admin Email'}
+                  {role === 'student' ? 'Student Index (e.g. BN001) or Email' : 'Admin / Owner Email or ID'}
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
@@ -338,43 +330,6 @@ export const AuthModal = () => {
                 </p>
               )
             )}
-          </div>
-
-          {/* Quick Demo Logins for easy testing */}
-          <div className="mt-5 p-3.5 bg-slate-50/90 rounded-2xl border border-slate-200/70">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-              <span>1-Click Demo Accounts</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('BN001', 'password123', 'student')}
-                className="text-left p-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/80 transition text-xs"
-              >
-                <div className="font-bold text-slate-800">Kasun (BN001)</div>
-                <div className="text-[10px] text-emerald-600 font-mono">Student Demo</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('BN002', 'password123', 'student')}
-                className="text-left p-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/80 transition text-xs"
-              >
-                <div className="font-bold text-slate-800">Nethmi (BN002)</div>
-                <div className="text-[10px] text-emerald-600 font-mono">Top Ranker</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin@bunnynotes.com', 'admin123', 'admin')}
-                className="col-span-2 text-left p-2 rounded-xl bg-white hover:bg-sky-50 border border-slate-200/80 transition text-xs flex items-center justify-between"
-              >
-                <div>
-                  <div className="font-bold text-slate-800">Admin Danushka</div>
-                  <div className="text-[10px] text-sky-600 font-mono">admin@bunnynotes.com</div>
-                </div>
-                <span className="px-2 py-0.5 bg-sky-100 text-sky-800 text-[10px] font-bold rounded-lg">Admin Demo</span>
-              </button>
-            </div>
           </div>
 
         </div>

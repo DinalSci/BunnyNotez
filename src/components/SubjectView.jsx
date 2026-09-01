@@ -424,7 +424,7 @@ export const SubjectView = ({ subject }) => {
                 B (65+)
               </div>
               <div className="p-1.5 bg-amber-50 rounded-lg border border-amber-200 font-bold text-amber-800">
-                C (55+)
+                C (50+)
               </div>
               <div className="p-1.5 bg-indigo-50 rounded-lg border border-indigo-200 font-bold text-indigo-800">
                 S (35+)

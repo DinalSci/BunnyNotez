@@ -10,7 +10,8 @@ import {
   UserPlus, 
   ShieldCheck,
   Sparkles,
-  Link2
+  Link2,
+  Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -19,18 +20,22 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   
   const [apiUrl, setApiUrl] = useState(initialConfig.apiUrl || '');
   const [telegramBotToken, setTelegramBotToken] = useState(initialConfig.telegramBotToken || '');
-  const [telegramChatId, setTelegramChatId] = useState(initialConfig.telegramChatId || '');
+  const [telegramBioChatId, setTelegramBioChatId] = useState(initialConfig.telegramBioChatId || '');
+  const [telegramChemChatId, setTelegramChemChatId] = useState(initialConfig.telegramChemChatId || '');
+  const [telegramPhyChatId, setTelegramPhyChatId] = useState(initialConfig.telegramPhyChatId || '');
   const [isLiveMode, setIsLiveMode] = useState(initialConfig.isLiveMode || false);
   const [autoTelegramAlerts, setAutoTelegramAlerts] = useState(initialConfig.autoTelegramAlerts !== false);
 
-  const [testStatus, setTestStatus] = useState({ loading: false, msg: '', error: false });
+  const [testBioStatus, setTestBioStatus] = useState({ loading: false, msg: '', error: false });
+  const [testChemStatus, setTestChemStatus] = useState({ loading: false, msg: '', error: false });
+  const [testPhyStatus, setTestPhyStatus] = useState({ loading: false, msg: '', error: false });
   const [saveStatus, setSaveStatus] = useState('');
 
   // New admin form
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
-  const [adminSubject, setAdminSubject] = useState('All');
+  const [adminSubject, setAdminSubject] = useState('Biology');
   const [adminMsg, setAdminMsg] = useState('');
 
   const handleSaveSettings = (e) => {
@@ -38,23 +43,25 @@ export const AdminSettings = ({ admins, onRefresh }) => {
     saveConfig({
       apiUrl: apiUrl.trim(),
       telegramBotToken: telegramBotToken.trim(),
-      telegramChatId: telegramChatId.trim(),
+      telegramBioChatId: telegramBioChatId.trim(),
+      telegramChemChatId: telegramChemChatId.trim(),
+      telegramPhyChatId: telegramPhyChatId.trim(),
       isLiveMode,
       autoTelegramAlerts
     });
 
-    setSaveStatus('Settings successfully saved to local environment!');
+    setSaveStatus('Owner settings successfully saved!');
     setTimeout(() => setSaveStatus(''), 4000);
   };
 
-  const handleTestTelegram = async () => {
-    setTestStatus({ loading: true, msg: '', error: false });
+  const handleTestGroup = async (subject, chatId, setStatus) => {
+    setStatus({ loading: true, msg: '', error: false });
     try {
-      await api.testTelegram(telegramBotToken.trim(), telegramChatId.trim());
-      confetti({ particleCount: 50, spread: 60 });
-      setTestStatus({ loading: false, msg: '✅ Test message delivered to your Telegram chat successfully!', error: false });
+      await api.testTelegramGroup(telegramBotToken.trim(), chatId.trim(), subject);
+      confetti({ particleCount: 40, spread: 50 });
+      setStatus({ loading: false, msg: `✅ ${subject} group alert delivered successfully!`, error: false });
     } catch (err) {
-      setTestStatus({ loading: false, msg: `❌ ${err.message}`, error: true });
+      setStatus({ loading: false, msg: `❌ ${err.message}`, error: true });
     }
   };
 
@@ -71,7 +78,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
         password: adminPassword.trim(),
         subject: adminSubject
       });
-      setAdminMsg(`Admin account created for ${adminName}!`);
+      setAdminMsg(`Admin account created for ${adminName} (${adminSubject})!`);
       setAdminName('');
       setAdminEmail('');
       setAdminPassword('');
@@ -84,15 +91,31 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   return (
     <div className="space-y-8 animate-fadeIn">
       
-      {/* Google Apps Script & Telegram Bot Configuration */}
+      {/* Owner Only Notice Banner */}
+      <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-3xl flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold">
+            👑
+          </div>
+          <div>
+            <div className="text-xs font-bold text-emerald-900">Owner Exclusive Control Center</div>
+            <div className="text-[11px] text-emerald-700">Only the study group owner can configure cloud backend & Telegram groups.</div>
+          </div>
+        </div>
+        <span className="px-2.5 py-1 bg-emerald-200 text-emerald-900 text-xs font-bold rounded-xl font-mono">
+          OWNER ACCESS
+        </span>
+      </div>
+
+      {/* Google Apps Script & 3 Telegram Groups Configuration */}
       <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/80 space-y-6">
         <div>
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-600" />
-            <span>Google Apps Script & Telegram Cloud Connection</span>
+            <span>Google Apps Script & 3 Subject Telegram Groups</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Connect your Google Sheet backend endpoint and Telegram Bot for automated student submissions & alerts.
+            Student submissions will be automatically routed to their corresponding subject group (Biology, Chemistry, Physics).
           </p>
         </div>
 
@@ -137,69 +160,124 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               onChange={(e) => setApiUrl(e.target.value)}
               className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
             />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Deploy your <code>backend/Code.gs</code> as Web App (Access: Anyone) and paste URL here.
-            </p>
           </div>
 
-          {/* Telegram Bot Token & Chat ID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                <Bot className="w-3.5 h-3.5 text-sky-600" />
-                <span>Telegram Bot Token</span>
-              </label>
-              <input
-                type="text"
-                placeholder="7123456789:AAFx..."
-                value={telegramBotToken}
-                onChange={(e) => setTelegramBotToken(e.target.value)}
-                className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                <Send className="w-3.5 h-3.5 text-sky-600" />
-                <span>Telegram Group / Chat ID</span>
-              </label>
-              <input
-                type="text"
-                placeholder="-100123456789 or @yourchannel"
-                value={telegramChatId}
-                onChange={(e) => setTelegramChatId(e.target.value)}
-                className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
-              />
-            </div>
+          {/* Shared Telegram Bot Token */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+              <Bot className="w-3.5 h-3.5 text-sky-600" />
+              <span>Telegram Bot Token (from @BotFather)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="7123456789:AAFx..."
+              value={telegramBotToken}
+              onChange={(e) => setTelegramBotToken(e.target.value)}
+              className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
+            />
           </div>
 
-          {/* Test Status Banner */}
-          {testStatus.msg && (
-            <div className={`p-3 rounded-2xl text-xs flex items-center gap-2 ${
-              testStatus.error ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-            }`}>
-              {testStatus.error ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle2 className="w-4 h-4 flex-shrink-0" />}
-              <span>{testStatus.msg}</span>
+          {/* 3 Subject Telegram Groups Grid */}
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Subject Telegram Groups Configuration
+            </h4>
+
+            {/* Biology Group */}
+            <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-200/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                  🧬 Biology Telegram Group ID
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleTestGroup('Biology', telegramBioChatId, setTestBioStatus)}
+                  disabled={!telegramBotToken || !telegramBioChatId || testBioStatus.loading}
+                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition disabled:opacity-40"
+                >
+                  {testBioStatus.loading ? 'Testing...' : 'Test Bio Alert'}
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="-100123456789 (Biology Chat ID)"
+                value={telegramBioChatId}
+                onChange={(e) => setTelegramBioChatId(e.target.value)}
+                className="w-full p-2 rounded-xl glass-input text-xs font-mono"
+              />
+              {testBioStatus.msg && (
+                <div className={`text-[11px] font-semibold ${testBioStatus.error ? 'text-rose-600' : 'text-emerald-700'}`}>
+                  {testBioStatus.msg}
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleTestTelegram}
-              disabled={testStatus.loading || !telegramBotToken || !telegramChatId}
-              className="px-4 py-2 rounded-xl bg-sky-100 hover:bg-sky-200 text-sky-800 text-xs font-bold transition flex items-center space-x-1.5 disabled:opacity-50"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>{testStatus.loading ? 'Sending Test...' : 'Send Test Telegram Alert'}</span>
-            </button>
+            {/* Chemistry Group */}
+            <div className="p-4 bg-cyan-50/50 rounded-2xl border border-cyan-200/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-800 flex items-center gap-1.5">
+                  🧪 Chemistry Telegram Group ID
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleTestGroup('Chemistry', telegramChemChatId, setTestChemStatus)}
+                  disabled={!telegramBotToken || !telegramChemChatId || testChemStatus.loading}
+                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-[11px] font-bold transition disabled:opacity-40"
+                >
+                  {testChemStatus.loading ? 'Testing...' : 'Test Chem Alert'}
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="-100987654321 (Chemistry Chat ID)"
+                value={telegramChemChatId}
+                onChange={(e) => setTelegramChemChatId(e.target.value)}
+                className="w-full p-2 rounded-xl glass-input text-xs font-mono"
+              />
+              {testChemStatus.msg && (
+                <div className={`text-[11px] font-semibold ${testChemStatus.error ? 'text-rose-600' : 'text-cyan-700'}`}>
+                  {testChemStatus.msg}
+                </div>
+              )}
+            </div>
 
+            {/* Physics Group */}
+            <div className="p-4 bg-sky-50/50 rounded-2xl border border-sky-200/70 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-800 flex items-center gap-1.5">
+                  ⚛️ Physics Telegram Group ID
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleTestGroup('Physics', telegramPhyChatId, setTestPhyStatus)}
+                  disabled={!telegramBotToken || !telegramPhyChatId || testPhyStatus.loading}
+                  className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-[11px] font-bold transition disabled:opacity-40"
+                >
+                  {testPhyStatus.loading ? 'Testing...' : 'Test Physics Alert'}
+                </button>
+              </div>
+              <input
+                type="text"
+                placeholder="-100554433221 (Physics Chat ID)"
+                value={telegramPhyChatId}
+                onChange={(e) => setTelegramPhyChatId(e.target.value)}
+                className="w-full p-2 rounded-xl glass-input text-xs font-mono"
+              />
+              {testPhyStatus.msg && (
+                <div className={`text-[11px] font-semibold ${testPhyStatus.error ? 'text-rose-600' : 'text-sky-700'}`}>
+                  {testPhyStatus.msg}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="flex justify-end pt-3">
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition"
             >
-              Save Configuration
+              Save Cloud Configuration
             </button>
           </div>
         </form>
@@ -208,14 +286,14 @@ export const AdminSettings = ({ admins, onRefresh }) => {
       {/* Multi-Admin Management & Creation */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Create New Admin Form (6 Cols) */}
+        {/* Create Subject Admin (6 Cols) */}
         <div className="lg:col-span-6 glass-panel p-6 rounded-3xl border border-white/80 space-y-4">
           <div>
             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
               <UserPlus className="w-4 h-4 text-emerald-600" />
-              <span>Create New Admin Account</span>
+              <span>Create Subject Admin Account</span>
             </h3>
-            <p className="text-xs text-slate-500">Add subject teachers / moderators with admin permissions.</p>
+            <p className="text-xs text-slate-500">Each admin will only see papers & marks for their assigned subject.</p>
           </div>
 
           {adminMsg && (
@@ -229,7 +307,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Admin Full Name</label>
               <input
                 type="text"
-                placeholder="e.g. Kasun Chamara (Sir)"
+                placeholder="e.g. Danushka Sir"
                 value={adminName}
                 onChange={(e) => setAdminName(e.target.value)}
                 required
@@ -241,7 +319,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
               <input
                 type="email"
-                placeholder="kasun.bio@bunnynotes.com"
+                placeholder="danushka.bio@bunnynotes.com"
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 required
@@ -263,16 +341,15 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Subject Focus</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Subject</label>
                 <select
                   value={adminSubject}
                   onChange={(e) => setAdminSubject(e.target.value)}
-                  className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800"
+                  className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-bold"
                 >
-                  <option value="All">All Subjects</option>
-                  <option value="Biology">Biology</option>
-                  <option value="Chemistry">Chemistry</option>
-                  <option value="Physics">Physics</option>
+                  <option value="Biology">Biology Admin</option>
+                  <option value="Chemistry">Chemistry Admin</option>
+                  <option value="Physics">Physics Admin</option>
                 </select>
               </div>
             </div>
@@ -281,7 +358,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               type="submit"
               className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs shadow-md transition"
             >
-              Add Admin Account
+              Add Subject Admin Account
             </button>
           </form>
         </div>
@@ -290,17 +367,25 @@ export const AdminSettings = ({ admins, onRefresh }) => {
         <div className="lg:col-span-6 glass-panel p-6 rounded-3xl border border-white/80 space-y-4">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-600" />
-            <span>Active Admin Accounts ({admins.length})</span>
+            <span>Active Administrators ({admins.length})</span>
           </h3>
 
           <div className="space-y-2.5">
             {admins.map((adm) => (
               <div key={adm.admin_id} className="p-3 bg-white/80 rounded-2xl border border-slate-200/80 text-xs flex items-center justify-between">
                 <div>
-                  <div className="font-bold text-slate-800">{adm.name}</div>
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    {adm.name}
+                    {adm.role === 'owner' && <span className="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-bold">OWNER</span>}
+                  </div>
                   <div className="text-[11px] text-slate-400 font-mono">{adm.email}</div>
                 </div>
-                <span className="px-2.5 py-0.5 bg-sky-100 text-sky-800 font-bold rounded-lg text-[10px]">
+                <span className={`px-2.5 py-0.5 font-bold rounded-lg text-[10px] ${
+                  adm.subject === 'Biology' ? 'bg-emerald-100 text-emerald-800' :
+                  adm.subject === 'Chemistry' ? 'bg-cyan-100 text-cyan-800' :
+                  adm.subject === 'Physics' ? 'bg-sky-100 text-sky-800' :
+                  'bg-amber-100 text-amber-800'
+                }`}>
                   {adm.subject || 'All Subjects'}
                 </span>
               </div>

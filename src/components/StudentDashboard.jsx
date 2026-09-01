@@ -72,27 +72,6 @@ export const StudentDashboard = ({ setActiveTab }) => {
     }
   ];
 
-  // Prepare comparison chart data across 3 subjects
-  const comparisonData = [
-    {
-      name: 'Paper 01',
-      Biology: 84,
-      Chemistry: 68,
-      Physics: 62
-    },
-    {
-      name: 'Paper 02',
-      Biology: 78,
-      Chemistry: 74,
-      Physics: 66
-    },
-    {
-      name: 'Paper 03 (Recent)',
-      Biology: 88,
-      Chemistry: 76,
-      Physics: 70
-    }
-  ];
 
   // Active ongoing papers across all subjects
   const activePapers = papers.filter(p => p.status === 'active');

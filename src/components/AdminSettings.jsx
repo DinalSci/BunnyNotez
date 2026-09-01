@@ -80,14 +80,14 @@ export const AdminSettings = ({ admins, onRefresh }) => {
     }
   };
 
-  const handleCreateAdmin = (e) => {
+  const handleCreateAdmin = async (e) => {
     e.preventDefault();
     setAdminMsg('');
     try {
       if (!adminName.trim() || !adminEmail.trim() || !adminPassword.trim()) {
         throw new Error('Please fill in all admin fields.');
       }
-      api.createAdmin({
+      await api.createAdmin({
         name: adminName.trim(),
         email: adminEmail.trim(),
         password: adminPassword.trim(),

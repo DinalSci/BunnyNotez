@@ -583,7 +583,37 @@ export const api = {
     return { success: true, mark: markRecord };
   },
 
-  createAdmin({ name, email, password, subject = 'Biology' }) {
+  async createAdmin({ name, email, password, subject = 'Biology' }) {
+    const config = getConfig();
+    if (config.isLiveMode && config.apiUrl) {
+      try {
+        const response = await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'createAdmin',
+            name,
+            email,
+            password,
+            subject
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          // Sync with local storage
+          const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
+          admins.push(result.admin);
+          localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(admins));
+          return result;
+        }
+        throw new Error(result.error || 'Failed to create admin');
+      } catch (err) {
+        console.warn('Live API createAdmin failed, trying local store:', err);
+        throw err; // In live mode, we want to know if sheet save fails
+      }
+    }
+
+    // Local Storage Fallback
     const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
     const existing = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
     if (existing) {

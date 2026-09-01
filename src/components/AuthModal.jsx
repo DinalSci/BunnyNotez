@@ -253,7 +253,7 @@ export const AuthModal = () => {
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                   <input
                     type="text"
-                    placeholder={role === 'student' ? 'BN001 or student@gmail.com' : 'admin@bunnynotes.com'}
+                    placeholder={role === 'student' ? 'BN001 or student@gmail.com' : 'owner@bunnynotes.com'}
                     value={emailOrIndex}
                     onChange={(e) => setEmailOrIndex(e.target.value)}
                     required
@@ -285,6 +285,22 @@ export const AuthModal = () => {
                 </button>
               </div>
             </div>
+
+            {/* Role Helper Info Pill */}
+            {!isRegister && role === 'admin' && (
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-900">👑 Owner:</span>
+                  <code className="text-slate-700 font-bold">owner@bunnynotes.com</code>
+                  <span className="text-slate-400 font-mono">owner123</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                  <span className="font-bold text-sky-900">🧬 Bio Admin:</span>
+                  <code className="text-slate-700 font-bold">bio.admin@bunnynotes.com</code>
+                  <span className="text-slate-400 font-mono">admin123</span>
+                </div>
+              </div>
+            )}
 
             {/* Submit Button */}
             <button

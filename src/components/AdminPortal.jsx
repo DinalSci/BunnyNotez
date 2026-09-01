@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { AdminMarksManager } from './AdminMarksManager';
@@ -11,30 +11,64 @@ import {
   Users, 
   Settings, 
   ShieldCheck,
-  Sparkles,
-  RefreshCw,
-  FolderOpen
+  RefreshCw
 } from 'lucide-react';
 
 export const AdminPortal = () => {
   const { currentUser } = useAuth();
   const [adminSubTab, setAdminSubTab] = useState('marks');
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const adminData = api.getAdminPortalData(currentUser);
-  const { students, admins, papers, marks, submissions, isOwner } = adminData;
+  const [portalData, setPortalData] = useState({
+    students: [],
+    admins: [],
+    papers: [],
+    marks: [],
+    submissions: [],
+    isOwner: false
+  });
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const loadData = useCallback(async (showSyncIndicator = false) => {
+    if (showSyncIndicator) setSyncing(true);
+    try {
+      const data = await api.getAdminPortalData(currentUser);
+      setPortalData(data);
+    } catch (err) {
+      console.error('Failed to load portal data:', err);
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    loadData(false);
+  }, [loadData]);
 
   const handleRefresh = () => {
-    setRefreshTrigger(prev => prev + 1);
+    loadData(true);
   };
 
-  // Nav items: only include settings if user is the OWNER
+  const { students, admins, papers, marks, submissions, isOwner } = portalData;
+
   const navItems = [
     { id: 'marks', label: 'Marks & Evaluations', icon: Award, count: submissions.filter(s => s.status === 'Pending Marking').length },
     { id: 'papers', label: 'Paper Management', icon: FileText, count: papers.filter(p => p.status === 'active').length },
     { id: 'students', label: 'Student Directory', icon: Users, count: students.length },
     ...(isOwner ? [{ id: 'settings', label: 'Owner Cloud & Telegram Config', icon: Settings }] : [])
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-500 font-medium">Syncing with Google Sheet...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -76,6 +110,14 @@ export const AdminPortal = () => {
                 {papers.filter(p => p.status === 'active').length}
               </div>
             </div>
+            {/* Sync / Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              title="Sync from Google Sheet"
+              className="p-3.5 rounded-2xl bg-white/90 border border-slate-200/80 shadow-sm hover:bg-emerald-50 hover:border-emerald-300 transition"
+            >
+              <RefreshCw className={`w-5 h-5 text-slate-500 ${syncing ? 'animate-spin text-emerald-600' : ''}`} />
+            </button>
           </div>
         </div>
       </div>
@@ -98,7 +140,7 @@ export const AdminPortal = () => {
               <Icon className="w-4 h-4" />
               <span>{item.label}</span>
               {item.count !== undefined && item.count > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                   isActive ? 'bg-white/30 text-white' : 'bg-slate-200 text-slate-700'
                 }`}>
                   {item.count}

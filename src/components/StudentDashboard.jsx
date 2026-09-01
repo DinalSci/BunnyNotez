@@ -111,7 +111,7 @@ export const StudentDashboard = ({ setActiveTab }) => {
               <span>Bunny Notes Student Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-              Ayubowan, <span className="gradient-text-mint">{currentUser?.name}</span>! 🐰
+              Hello, <span className="gradient-text-mint">{currentUser?.name}</span>! 🐰
             </h1>
             <p className="text-slate-500 text-sm mt-1 max-w-xl">
               Track your A/L marks progression in Biology, Chemistry, and Physics. Download ongoing papers, submit written answers, and view evaluated feedback.

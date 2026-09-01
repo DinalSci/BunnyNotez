@@ -190,12 +190,14 @@ export const api = {
         const result = await response.json();
         if (result.success) {
           const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-          students.push(result.user);
+          // Ensure password is saved locally for offline fallback
+          students.push({ ...result.user, password });
           localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
           return result;
         }
-        throw new Error(result.error || 'Failed to register with Google Apps Script');
+        throw new Error(`SERVER_ERROR:${result.error || 'Failed to register with Google Apps Script'}`);
       } catch (err) {
+        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
         console.warn('Live API register failed, falling back to local:', err);
       }
     }
@@ -268,8 +270,9 @@ export const api = {
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(result.user));
           return result;
         }
-        throw new Error(result.error || 'Invalid credentials');
+        throw new Error(`SERVER_ERROR:${result.error || 'Invalid credentials'}`);
       } catch (err) {
+        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
         console.warn('Live API login failed, trying local store:', err);
       }
     }
@@ -281,7 +284,7 @@ export const api = {
         a.password === cleanPass
       );
       if (!admin) {
-        throw new Error('Invalid Admin / Owner email or password.');
+        throw new Error('Invalid Admin / Owner email or password. (Local)');
       }
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(admin));
       return { success: true, user: admin };
@@ -292,7 +295,7 @@ export const api = {
         s.password === cleanPass
       );
       if (!student) {
-        throw new Error('Invalid Student Index Number / Email or password.');
+        throw new Error('Invalid Student Index Number / Email or password. (Local)');
       }
       const user = { ...student, role: 'student' };
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
@@ -602,12 +605,13 @@ export const api = {
         if (result.success) {
           // Sync with local storage
           const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-          admins.push(result.admin);
+          admins.push({ ...result.admin, password });
           localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(admins));
           return result;
         }
-        throw new Error(result.error || 'Failed to create admin');
+        throw new Error(`SERVER_ERROR:${result.error || 'Failed to create admin'}`);
       } catch (err) {
+        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
         console.warn('Live API createAdmin failed, trying local store:', err);
         throw err; // In live mode, we want to know if sheet save fails
       }

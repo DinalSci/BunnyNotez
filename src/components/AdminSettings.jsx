@@ -11,7 +11,9 @@ import {
   ShieldCheck,
   Sparkles,
   Link2,
-  Lock
+  Lock,
+  FolderOpen,
+  HelpCircle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -23,6 +25,11 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   const [telegramBioChatId, setTelegramBioChatId] = useState(initialConfig.telegramBioChatId || '');
   const [telegramChemChatId, setTelegramChemChatId] = useState(initialConfig.telegramChemChatId || '');
   const [telegramPhyChatId, setTelegramPhyChatId] = useState(initialConfig.telegramPhyChatId || '');
+  
+  // Custom Google Drive Folder IDs
+  const [submissionsFolderId, setSubmissionsFolderId] = useState(initialConfig.submissionsFolderId || '');
+  const [questionPapersFolderId, setQuestionPapersFolderId] = useState(initialConfig.questionPapersFolderId || '');
+
   const [isLiveMode, setIsLiveMode] = useState(initialConfig.isLiveMode || false);
   const [autoTelegramAlerts, setAutoTelegramAlerts] = useState(initialConfig.autoTelegramAlerts !== false);
 
@@ -46,11 +53,13 @@ export const AdminSettings = ({ admins, onRefresh }) => {
       telegramBioChatId: telegramBioChatId.trim(),
       telegramChemChatId: telegramChemChatId.trim(),
       telegramPhyChatId: telegramPhyChatId.trim(),
+      submissionsFolderId: submissionsFolderId.trim(),
+      questionPapersFolderId: questionPapersFolderId.trim(),
       isLiveMode,
       autoTelegramAlerts
     });
 
-    setSaveStatus('Owner settings successfully saved!');
+    setSaveStatus('Owner settings & Custom Drive Folder IDs successfully saved!');
     setTimeout(() => setSaveStatus(''), 4000);
   };
 
@@ -91,15 +100,15 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   return (
     <div className="space-y-8 animate-fadeIn">
       
-      {/* Owner Only Notice Banner */}
+      {/* Owner Notice */}
       <div className="p-4 bg-emerald-50/80 border border-emerald-200 rounded-3xl flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold text-lg">
             👑
           </div>
           <div>
-            <div className="text-xs font-bold text-emerald-900">Owner Exclusive Control Center</div>
-            <div className="text-[11px] text-emerald-700">Only the study group owner can configure cloud backend & Telegram groups.</div>
+            <div className="text-xs font-bold text-emerald-900">Owner Cloud & Storage Control</div>
+            <div className="text-[11px] text-emerald-700">Manage Google Apps Script URL, external Drive Folder IDs, and Telegram Groups.</div>
           </div>
         </div>
         <span className="px-2.5 py-1 bg-emerald-200 text-emerald-900 text-xs font-bold rounded-xl font-mono">
@@ -107,15 +116,15 @@ export const AdminSettings = ({ admins, onRefresh }) => {
         </span>
       </div>
 
-      {/* Google Apps Script & 3 Telegram Groups Configuration */}
+      {/* Main Settings Form */}
       <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-white/80 space-y-6">
         <div>
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <Settings className="w-5 h-5 text-emerald-600" />
-            <span>Google Apps Script & 3 Subject Telegram Groups</span>
+            <span>Google Apps Script, External Drive & Telegram Setup</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Student submissions will be automatically routed to their corresponding subject group (Biology, Chemistry, Physics).
+            Configure custom storage folders from another Google Account and real-time subject Telegram dispatch.
           </p>
         </div>
 
@@ -126,14 +135,14 @@ export const AdminSettings = ({ admins, onRefresh }) => {
           </div>
         )}
 
-        <form onSubmit={handleSaveSettings} className="space-y-5">
+        <form onSubmit={handleSaveSettings} className="space-y-6">
           
           {/* Mode Switcher */}
           <div className="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 flex items-center justify-between">
             <div>
               <div className="text-xs font-bold text-slate-800">Connection Mode</div>
               <div className="text-[11px] text-slate-500">
-                {isLiveMode ? 'Active: Live Google Apps Script API' : 'Active: High-speed Local / Offline Mock Mode'}
+                {isLiveMode ? 'Active: Live Google Apps Script API & Drive' : 'Active: High-speed Local / Offline Mock Mode'}
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -160,6 +169,61 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               onChange={(e) => setApiUrl(e.target.value)}
               className="w-full p-2.5 rounded-2xl glass-input text-xs text-slate-800 font-mono"
             />
+          </div>
+
+          {/* Custom External Google Drive Folder IDs Card */}
+          <div className="p-5 bg-gradient-to-r from-emerald-50/60 to-teal-50/40 rounded-2xl border border-emerald-200/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FolderOpen className="w-5 h-5 text-emerald-600" />
+                <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                  External Google Drive Folder IDs (වෙනත් Google Account එකක Folders)
+                </h4>
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/90 rounded-xl border border-emerald-100 text-[11px] text-slate-600 space-y-1">
+              <p className="font-bold text-emerald-900 flex items-center gap-1">
+                <HelpCircle className="w-3.5 h-3.5 text-emerald-600" /> වෙනත් Google Account එකක Folder එකක් සම්බන්ධ කරන්නේ කෙසේද?
+              </p>
+              <p>
+                1. එම අනෙක් Google Account එකේ Drive එකට ගොස් ඔබ කැමති Folder එකක් සාදන්න.
+              </p>
+              <p>
+                2. එම Folder එක <strong>Share</strong> කර, ඔබගේ Google Apps Script එක deploy කළ Gmail ලිපිනයට <strong>Editor</strong> permission ලබා දෙන්න.
+              </p>
+              <p>
+                3. Folder එකේ URL එකේ අග ඇති Folder ID එක (e.g. <code className="bg-slate-100 px-1 rounded text-emerald-800 font-bold">1aBcDeFgHiJkLmNoPqRsTuVwXyZ</code>) මෙතැනට Paste කරන්න.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  📁 Submissions Folder ID (සිසුන්ගේ Answer Papers)
+                </label>
+                <input
+                  type="text"
+                  placeholder="1aBcDeFgHiJkLmNoPqRsTuVwXyZ..."
+                  value={submissionsFolderId}
+                  onChange={(e) => setSubmissionsFolderId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl glass-input text-xs font-mono text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  📄 Question Papers Folder ID (ප්‍රශ්න පත්‍ර)
+                </label>
+                <input
+                  type="text"
+                  placeholder="1ZyXwVuTsRqPoNmLkJiHgFeDcBa..."
+                  value={questionPapersFolderId}
+                  onChange={(e) => setQuestionPapersFolderId(e.target.value)}
+                  className="w-full p-2.5 rounded-xl glass-input text-xs font-mono text-slate-800"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Shared Telegram Bot Token */}
@@ -277,13 +341,13 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               type="submit"
               className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition"
             >
-              Save Cloud Configuration
+              Save Cloud & Storage Configuration
             </button>
           </div>
         </form>
       </div>
 
-      {/* Multi-Admin Management & Creation */}
+      {/* Multi-Admin Management */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Create Subject Admin (6 Cols) */}

@@ -462,7 +462,50 @@ export const api = {
     };
   },
 
-  getAdminPortalData(adminUser) {
+  async getAdminPortalData(adminUser) {
+    const config = getConfig();
+
+    // If Live Mode is ON, fetch fresh data from Google Sheet and cache locally
+    if (config.isLiveMode && config.apiUrl) {
+      try {
+        const response = await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'getPortalData' })
+        });
+        const result = await response.json();
+        if (result.success) {
+          // Cache all fresh sheet data to localStorage (preserve passwords already saved locally)
+          const localStudents = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
+          const mergedStudents = result.students.map(sheetS => {
+            const local = localStudents.find(l => l.index_no === sheetS.index_no);
+            return { ...sheetS, password: sheetS.password || local?.password || '' };
+          });
+          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(mergedStudents));
+
+          const localAdmins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
+          const mergedAdmins = result.admins.map(sheetA => {
+            const local = localAdmins.find(l => l.admin_id === sheetA.admin_id || l.email === sheetA.email);
+            return { ...sheetA, password: sheetA.password || local?.password || '' };
+          });
+          // Always ensure owner exists in merged admins
+          const ownerExists = mergedAdmins.some(a => a.role === 'owner');
+          if (!ownerExists) {
+            const localOwner = localAdmins.find(a => a.role === 'owner');
+            if (localOwner) mergedAdmins.unshift(localOwner);
+          }
+          localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(mergedAdmins));
+
+          localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(result.papers));
+          localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(result.marks));
+          localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(result.submissions));
+        }
+      } catch (err) {
+        console.warn('Failed to sync from Sheet, using local cache:', err);
+      }
+    }
+
+    // Read from localStorage (freshly synced or cached)
     const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
     const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
     let papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
@@ -474,19 +517,12 @@ export const api = {
     const adminSubject = adminUser?.subject;
 
     if (!isOwner && !isSuperAdmin && adminSubject) {
-      papers = papers.filter(p => p.subject.toLowerCase() === adminSubject.toLowerCase());
-      marks = marks.filter(m => m.subject.toLowerCase() === adminSubject.toLowerCase());
-      submissions = submissions.filter(s => s.subject.toLowerCase() === adminSubject.toLowerCase());
+      papers = papers.filter(p => p.subject?.toLowerCase() === adminSubject.toLowerCase());
+      marks = marks.filter(m => m.subject?.toLowerCase() === adminSubject.toLowerCase());
+      submissions = submissions.filter(s => s.subject?.toLowerCase() === adminSubject.toLowerCase());
     }
 
-    return {
-      students,
-      admins,
-      papers,
-      marks,
-      submissions,
-      isOwner
-    };
+    return { students, admins, papers, marks, submissions, isOwner };
   },
 
   async savePaper(paperData) {

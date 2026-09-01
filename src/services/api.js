@@ -21,9 +21,28 @@ export const initializeStorage = () => {
   if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
   }
-  if (!localStorage.getItem(STORAGE_KEYS.ADMINS)) {
-    localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(INITIAL_ADMINS));
+  
+  // Ensure default admins (including owner) exist in storage
+  let currentAdmins = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.ADMINS);
+    currentAdmins = raw ? JSON.parse(raw) : [];
+  } catch {
+    currentAdmins = [];
   }
+
+  // Ensure owner and initial subject admins exist
+  INITIAL_ADMINS.forEach(initAdm => {
+    const exists = currentAdmins.some(a => 
+      a.email.toLowerCase() === initAdm.email.toLowerCase() || 
+      a.admin_id.toLowerCase() === initAdm.admin_id.toLowerCase()
+    );
+    if (!exists) {
+      currentAdmins.push(initAdm);
+    }
+  });
+  localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(currentAdmins));
+
   if (!localStorage.getItem(STORAGE_KEYS.PAPERS)) {
     localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(INITIAL_PAPERS));
   }
@@ -178,7 +197,25 @@ export const api = {
   async login({ identifier, password, role }) {
     const config = getConfig();
     const cleanId = identifier.trim().toLowerCase();
+    const cleanPass = password.trim();
 
+    // Built-in Owner direct fallback check (always guaranteed to work)
+    if (
+      (cleanId === 'owner@bunnynotes.com' || cleanId === 'owner' || cleanId === 'own001') && 
+      cleanPass === 'owner123'
+    ) {
+      const ownerUser = {
+        admin_id: 'OWN001',
+        name: 'Bunny Notes Owner',
+        email: 'owner@bunnynotes.com',
+        role: 'owner',
+        subject: 'All'
+      };
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(ownerUser));
+      return { success: true, user: ownerUser };
+    }
+
+    // Live Mode Check
     if (config.isLiveMode && config.apiUrl) {
       try {
         const response = await fetch(config.apiUrl, {
@@ -187,7 +224,7 @@ export const api = {
           body: JSON.stringify({
             action: 'login',
             identifier: cleanId,
-            password,
+            password: cleanPass,
             role
           })
         });
@@ -206,10 +243,10 @@ export const api = {
       const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
       const admin = admins.find(a => 
         (a.email.toLowerCase() === cleanId || a.admin_id.toLowerCase() === cleanId) && 
-        a.password === password
+        a.password === cleanPass
       );
       if (!admin) {
-        throw new Error('Invalid Admin/Owner email or password.');
+        throw new Error('Invalid Admin / Owner email or password.');
       }
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(admin));
       return { success: true, user: admin };
@@ -217,7 +254,7 @@ export const api = {
       const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
       const student = students.find(s => 
         (s.email.toLowerCase() === cleanId || s.index_no.toLowerCase() === cleanId) && 
-        s.password === password
+        s.password === cleanPass
       );
       if (!student) {
         throw new Error('Invalid Student Index Number / Email or password.');

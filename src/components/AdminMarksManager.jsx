@@ -177,7 +177,7 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, curren
               <span>Enter Student Marks & Upload Marked PDF</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-          
+              Grade (A: 75+, B: 65+, C: 50+, S: 35+) is calculated automatically.
             </p>
           </div>
 
@@ -268,7 +268,7 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, curren
             {/* Score & Calculated Grade */}
             <div className="grid grid-cols-2 gap-3 items-end">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Score</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Score (out of 100)</label>
                 <input
                   type="number"
                   min="0"
@@ -282,7 +282,7 @@ export const AdminMarksManager = ({ students, papers, marks, submissions, curren
               </div>
 
               <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between h-[42px] px-4">
-                <span className="text-xs text-slate-500 font-medium"></span>
+                <span className="text-xs text-slate-500 font-medium">Grade (50+ is C):</span>
                 <span className={`px-2.5 py-0.5 rounded-xl text-xs font-black border ${getGradeColor(calculateGrade(score))}`}>
                   Grade {calculateGrade(score)}
                 </span>

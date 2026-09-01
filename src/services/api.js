@@ -466,10 +466,11 @@ export const api = {
     let marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
     let submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
 
-    const isOwner = adminUser?.role === 'owner' || adminUser?.subject === 'All';
+    const isOwner = adminUser?.role === 'owner';
+    const isSuperAdmin = adminUser?.subject === 'All' || adminUser?.role === 'super_admin';
     const adminSubject = adminUser?.subject;
 
-    if (!isOwner && adminSubject) {
+    if (!isOwner && !isSuperAdmin && adminSubject) {
       papers = papers.filter(p => p.subject.toLowerCase() === adminSubject.toLowerCase());
       marks = marks.filter(m => m.subject.toLowerCase() === adminSubject.toLowerCase());
       submissions = submissions.filter(s => s.subject.toLowerCase() === adminSubject.toLowerCase());
@@ -593,7 +594,7 @@ export const api = {
       name,
       email,
       password,
-      role: 'admin',
+      role: subject === 'All' ? 'super_admin' : 'admin',
       subject
     };
     admins.push(newAdmin);

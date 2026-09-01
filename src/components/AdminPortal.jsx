@@ -46,7 +46,7 @@ export const AdminPortal = () => {
             <div className="flex items-center space-x-2">
               <span className="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-xs font-bold uppercase tracking-wider border border-teal-200 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" /> 
-                {isOwner ? '👑 Super Admin / Owner Portal' : `📚 ${currentUser?.subject} Specialized Admin Portal`}
+                {isOwner ? '👑 Owner Portal' : currentUser?.role === 'super_admin' ? '🌟 Super Admin Portal (All Subjects)' : `📚 ${currentUser?.subject} Specialized Admin Portal`}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 mt-2">

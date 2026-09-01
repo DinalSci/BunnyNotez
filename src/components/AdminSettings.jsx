@@ -420,6 +420,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
                   <option value="Biology">Biology Admin</option>
                   <option value="Chemistry">Chemistry Admin</option>
                   <option value="Physics">Physics Admin</option>
+                  <option value="All">Super Admin (All Subjects)</option>
                 </select>
               </div>
             </div>

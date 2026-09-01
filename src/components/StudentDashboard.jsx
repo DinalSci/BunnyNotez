@@ -72,6 +72,22 @@ export const StudentDashboard = ({ setActiveTab }) => {
     }
   ];
 
+  // Prepare comparison chart data across 3 subjects dynamically
+  const comparisonData = [];
+  const bioMarks = studentMarks.filter(m => m.subject.toLowerCase() === 'biology').sort((a, b) => a.id.localeCompare(b.id));
+  const chemMarks = studentMarks.filter(m => m.subject.toLowerCase() === 'chemistry').sort((a, b) => a.id.localeCompare(b.id));
+  const phyMarks = studentMarks.filter(m => m.subject.toLowerCase() === 'physics').sort((a, b) => a.id.localeCompare(b.id));
+
+  const maxLen = Math.max(bioMarks.length, chemMarks.length, phyMarks.length);
+
+  for (let i = 0; i < maxLen; i++) {
+    comparisonData.push({
+      name: `Paper ${String(i + 1).padStart(2, '0')}`,
+      Biology: bioMarks[i] ? Number(bioMarks[i].score) : null,
+      Chemistry: chemMarks[i] ? Number(chemMarks[i].score) : null,
+      Physics: phyMarks[i] ? Number(phyMarks[i].score) : null
+    });
+  }
 
   // Active ongoing papers across all subjects
   const activePapers = papers.filter(p => p.status === 'active');
@@ -90,7 +106,7 @@ export const StudentDashboard = ({ setActiveTab }) => {
               <span>Bunny Notes Student Dashboard</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-              Hello, <span className="gradient-text-mint">{currentUser?.name}</span>! 🐰
+              Ayubowan, <span className="gradient-text-mint">{currentUser?.name}</span>! 🐰
             </h1>
             <p className="text-slate-500 text-sm mt-1 max-w-xl">
               Track your A/L marks progression in Biology, Chemistry, and Physics. Download ongoing papers, submit written answers, and view evaluated feedback.
@@ -282,26 +298,33 @@ export const StudentDashboard = ({ setActiveTab }) => {
             </div>
           </div>
 
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    borderRadius: '16px',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
-                <Bar dataKey="Biology" fill="#10b981" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Chemistry" fill="#06b6d4" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Physics" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-72 w-full flex items-center justify-center">
+            {comparisonData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={12} domain={[0, 100]} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '10px' }} />
+                  <Bar dataKey="Biology" fill="#10b981" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Chemistry" fill="#06b6d4" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="Physics" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-slate-400 text-sm font-medium flex flex-col items-center gap-2">
+                <TrendingUp className="w-8 h-8 opacity-20" />
+                <span>No marks recorded yet. Complete a paper to see your progression!</span>
+              </div>
+            )}
           </div>
         </div>
 

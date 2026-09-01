@@ -187,7 +187,7 @@ export const AuthModal = () => {
                     <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       type="text"
-                      placeholder="e.g. Pubudu Dinal"
+                      placeholder="e.g. Kasun Perera"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required

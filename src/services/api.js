@@ -190,15 +190,13 @@ export const api = {
         const result = await response.json();
         if (result.success) {
           const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-          // Ensure password is saved locally for offline fallback
           students.push({ ...result.user, password });
           localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
           return result;
         }
-        throw new Error(`SERVER_ERROR:${result.error || 'Failed to register with Google Apps Script'}`);
+        throw new Error(result.error || 'Failed to register with Google Sheet backend');
       } catch (err) {
-        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
-        console.warn('Live API register failed, falling back to local:', err);
+        throw new Error(err.message || 'Google Sheet registration failed. Please check network connection.');
       }
     }
 
@@ -236,7 +234,7 @@ export const api = {
     const cleanId = identifier.trim().toLowerCase();
     const cleanPass = password.trim();
 
-    // Built-in Owner direct fallback check (always guaranteed to work)
+    // Built-in Owner direct fallback check (always guaranteed to work for initial setup)
     if (
       (cleanId === 'owner@bunnynotes.com' || cleanId === 'owner' || cleanId === 'own001') && 
       cleanPass === 'owner123'
@@ -252,7 +250,7 @@ export const api = {
       return { success: true, user: ownerUser };
     }
 
-    // Live Mode Check
+    // Live Mode Check: Strict Google Sheet Authentication
     if (config.isLiveMode && config.apiUrl) {
       try {
         const response = await fetch(config.apiUrl, {
@@ -270,13 +268,13 @@ export const api = {
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(result.user));
           return result;
         }
-        throw new Error(`SERVER_ERROR:${result.error || 'Invalid credentials'}`);
+        throw new Error(result.error || 'Invalid credentials in Google Sheet.');
       } catch (err) {
-        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
-        console.warn('Live API login failed, trying local store:', err);
+        throw new Error(err.message || 'Failed to authenticate with Google Sheet.');
       }
     }
 
+    // Offline / Local Storage Mode (Only when Live Mode is disabled)
     if (role === 'admin' || role === 'owner') {
       const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
       const admin = admins.find(a => 
@@ -284,7 +282,7 @@ export const api = {
         a.password === cleanPass
       );
       if (!admin) {
-        throw new Error('Invalid Admin / Owner email or password. (Local)');
+        throw new Error('Invalid Admin / Owner email or password.');
       }
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(admin));
       return { success: true, user: admin };
@@ -295,7 +293,7 @@ export const api = {
         s.password === cleanPass
       );
       if (!student) {
-        throw new Error('Invalid Student Index Number / Email or password. (Local)');
+        throw new Error('Invalid Student Index Number / Email or password.');
       }
       const user = { ...student, role: 'student' };
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));

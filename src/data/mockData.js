@@ -13,30 +13,6 @@ export const INITIAL_ADMINS = [
     role: 'owner',
     subject: 'All'
   },
-  {
-    admin_id: 'ADM001',
-    name: 'Danushka Sir',
-    email: 'bio.admin@bunnynotes.com',
-    password: 'admin123',
-    role: 'admin',
-    subject: 'Biology'
-  },
-  {
-    admin_id: 'ADM002',
-    name: 'Tharindu Sir',
-    email: 'chem.admin@bunnynotes.com',
-    password: 'admin123',
-    role: 'admin',
-    subject: 'Chemistry'
-  },
-  {
-    admin_id: 'ADM003',
-    name: 'Nuwan Sir',
-    email: 'phy.admin@bunnynotes.com',
-    password: 'admin123',
-    role: 'admin',
-    subject: 'Physics'
-  }
 ];
 
 export const INITIAL_PAPERS = [];

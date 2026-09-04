@@ -172,8 +172,9 @@ export const getNextIndexNumber = () => {
 export const api = {
   async registerStudent({ name, email, password, phone, batch = '2027 A/L' }) {
     const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
 
-    if (config.isLiveMode && config.apiUrl) {
+    if (isLive) {
       try {
         const response = await fetch(config.apiUrl, {
           method: 'POST',
@@ -251,7 +252,8 @@ export const api = {
     }
 
     // Live Mode Check: Strict Google Sheet Authentication
-    if (config.isLiveMode && config.apiUrl) {
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
+    if (isLive) {
       try {
         const response = await fetch(config.apiUrl, {
           method: 'POST',

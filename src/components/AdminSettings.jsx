@@ -15,7 +15,9 @@ import {
   FolderOpen,
   HelpCircle,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  KeyRound,
+  X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -50,6 +52,29 @@ export const AdminSettings = ({ admins, onRefresh }) => {
   // Factory reset confirmation
   const [resetConfirm, setResetConfirm] = useState(false);
   const [resetInput, setResetInput] = useState('');
+
+  // Admin password reset
+  const [editingAdminId, setEditingAdminId] = useState(null);
+  const [newPwValue, setNewPwValue] = useState('');
+
+  const handleDeleteAdmin = (adminId) => {
+    const admins = JSON.parse(localStorage.getItem('bn_admins') || '[]');
+    const updated = admins.filter(a => a.admin_id !== adminId);
+    localStorage.setItem('bn_admins', JSON.stringify(updated));
+    onRefresh();
+  };
+
+  const handleResetAdminPassword = (adminId) => {
+    if (!newPwValue.trim()) return;
+    const admins = JSON.parse(localStorage.getItem('bn_admins') || '[]');
+    const updated = admins.map(a =>
+      a.admin_id === adminId ? { ...a, password: newPwValue.trim() } : a
+    );
+    localStorage.setItem('bn_admins', JSON.stringify(updated));
+    setEditingAdminId(null);
+    setNewPwValue('');
+    onRefresh();
+  };
 
   const handleSaveSettings = (e) => {
     e.preventDefault();
@@ -443,22 +468,84 @@ export const AdminSettings = ({ admins, onRefresh }) => {
 
           <div className="space-y-2.5">
             {admins.map((adm) => (
-              <div key={adm.admin_id} className="p-3 bg-white/80 rounded-2xl border border-slate-200/80 text-xs flex items-center justify-between">
-                <div>
-                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                    {adm.name}
-                    {adm.role === 'owner' && <span className="text-[10px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-bold">OWNER</span>}
+              <div key={adm.admin_id} className="p-3 bg-white/80 rounded-2xl border border-slate-200/80 text-xs space-y-2">
+                {/* Admin Info Row */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                      {adm.name}
+                      {adm.role === 'owner' && <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-bold">OWNER</span>}
+                      {adm.role === 'super_admin' && <span className="text-[10px] px-1.5 py-0.5 bg-violet-100 text-violet-800 rounded font-bold">SUPER ADMIN</span>}
+                      {/* Password missing warning */}
+                      {!adm.password && adm.role !== 'owner' && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded font-bold flex items-center gap-0.5">
+                          ⚠️ No Local PW
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono">{adm.email}</div>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono">{adm.email}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2.5 py-0.5 font-bold rounded-lg text-[10px] ${
+                      adm.subject === 'Biology' ? 'bg-emerald-100 text-emerald-800' :
+                      adm.subject === 'Chemistry' ? 'bg-cyan-100 text-cyan-800' :
+                      adm.subject === 'Physics' ? 'bg-sky-100 text-sky-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {adm.subject || 'All Subjects'}
+                    </span>
+                    {adm.role !== 'owner' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingAdminId(editingAdminId === adm.admin_id ? null : adm.admin_id);
+                            setNewPwValue('');
+                          }}
+                          title="Reset password locally"
+                          className="p-1.5 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-700 transition"
+                        >
+                          <KeyRound className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`Delete admin "${adm.name}"?`)) {
+                              handleDeleteAdmin(adm.admin_id);
+                            }
+                          }}
+                          title="Delete admin"
+                          className="p-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <span className={`px-2.5 py-0.5 font-bold rounded-lg text-[10px] ${
-                  adm.subject === 'Biology' ? 'bg-emerald-100 text-emerald-800' :
-                  adm.subject === 'Chemistry' ? 'bg-cyan-100 text-cyan-800' :
-                  adm.subject === 'Physics' ? 'bg-sky-100 text-sky-800' :
-                  'bg-amber-100 text-amber-800'
-                }`}>
-                  {adm.subject || 'All Subjects'}
-                </span>
+
+                {/* Inline password reset */}
+                {editingAdminId === adm.admin_id && (
+                  <div className="flex gap-2 pt-1 border-t border-slate-100">
+                    <input
+                      type="text"
+                      placeholder="Enter new local password"
+                      value={newPwValue}
+                      onChange={(e) => setNewPwValue(e.target.value)}
+                      className="flex-1 p-2 rounded-xl border border-sky-200 bg-sky-50 text-xs font-mono text-slate-800 outline-none focus:border-sky-400"
+                    />
+                    <button
+                      onClick={() => handleResetAdminPassword(adm.admin_id)}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-xl transition"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setEditingAdminId(null); setNewPwValue(''); }}
+                      className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-xl transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

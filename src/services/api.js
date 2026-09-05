@@ -542,13 +542,14 @@ export const api = {
 
     if (isLive) {
       try {
+        const { fileDataUrl, ...restPaperData } = paperData;
         const payload = {
           action: 'savePaper',
-          ...paperData,
+          ...restPaperData,
           questionPapersFolderId: config.questionPapersFolderId
         };
-        if (paperData.fileDataUrl) {
-          payload.fileBase64 = paperData.fileDataUrl.split(',')[1];
+        if (fileDataUrl && fileDataUrl.includes(',')) {
+          payload.fileBase64 = fileDataUrl.split(',')[1];
           payload.fileName = `${paperData.subject}_${paperData.paper_name.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
         }
 
@@ -561,9 +562,12 @@ export const api = {
         if (res.success) {
           if (res.drive_url) finalPdfUrl = res.drive_url;
           if (res.paper_id) serverPaperId = res.paper_id;
+        } else {
+          throw new Error(res.error || 'Failed to save paper to Google Sheet.');
         }
       } catch (err) {
-        console.warn('Live paper upload failed:', err);
+        console.error('Live paper upload error:', err);
+        throw err;
       }
     }
 

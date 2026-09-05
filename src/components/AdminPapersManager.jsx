@@ -81,11 +81,21 @@ export const AdminPapersManager = ({ papers, currentAdmin, onRefresh }) => {
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (confirm('Are you sure you want to delete this paper?')) {
-      api.deletePaper(id);
+      await api.deletePaper(id);
       onRefresh();
     }
+  };
+
+  const handleToggleStatus = async (paper) => {
+    const isCurrentlyActive = (paper.status || '').toString().trim().toLowerCase() === 'active';
+    const newStatus = isCurrentlyActive ? 'closed' : 'active';
+    await api.savePaper({
+      ...paper,
+      status: newStatus
+    });
+    onRefresh();
   };
 
   return (
@@ -301,11 +311,17 @@ export const AdminPapersManager = ({ papers, currentAdmin, onRefresh }) => {
                       <div className="text-[11px] text-slate-400 font-normal">{p.description}</div>
                     </td>
                     <td className="py-3.5 px-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                        p.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {p.status}
-                      </span>
+                      <button
+                        onClick={() => handleToggleStatus(p)}
+                        title="Click to toggle Active / Closed"
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase cursor-pointer hover:opacity-80 transition ${
+                          (p.status || '').toString().trim().toLowerCase() === 'active'
+                            ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+                            : 'bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {p.status || 'closed'}
+                      </button>
                     </td>
                     <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
                       {p.deadline}

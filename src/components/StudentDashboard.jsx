@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { getGradeColor } from '../data/mockData';
@@ -15,7 +15,8 @@ import {
   Clock,
   CheckCircle2,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -32,6 +33,19 @@ import {
 
 export const StudentDashboard = ({ setActiveTab }) => {
   const { currentUser } = useAuth();
+  const [syncVersion, setSyncVersion] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    api.syncPortalData().then(res => {
+      if (mounted && res) {
+        setSyncVersion(v => v + 1);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
+
   const portalData = api.getStudentPortalData(currentUser?.index_no);
 
   const { subjectStats, papers, studentMarks, studentSubmissions } = portalData;
@@ -89,8 +103,8 @@ export const StudentDashboard = ({ setActiveTab }) => {
     });
   }
 
-  // Active ongoing papers across all subjects
-  const activePapers = papers.filter(p => p.status === 'active');
+  // Active ongoing papers across all subjects (case-insensitive & trimmed)
+  const activePapers = papers.filter(p => (p.status || '').toString().trim().toLowerCase() === 'active');
 
   return (
     <div className="space-y-8 animate-fadeIn">

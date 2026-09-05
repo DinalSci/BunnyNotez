@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { getGradeColor } from '../data/mockData';
@@ -14,7 +14,8 @@ import {
   AlertCircle,
   ExternalLink,
   Sparkles,
-  Send
+  Send,
+  RefreshCw
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -33,6 +34,17 @@ export const SubjectView = ({ subject }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [syncVersion, setSyncVersion] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    api.syncPortalData().then(res => {
+      if (mounted && res) {
+        setSyncVersion(v => v + 1);
+      }
+    });
+    return () => { mounted = false; };
+  }, [subject]);
 
   // Fetch student subject data
   const portalData = api.getStudentPortalData(currentUser?.index_no);
@@ -40,8 +52,14 @@ export const SubjectView = ({ subject }) => {
 
   const currentStat = subjectStats[subject] || {};
   const currentSubjectMarks = studentMarks.filter(m => m.subject.toLowerCase() === subject.toLowerCase());
-  const activePaper = papers.find(p => p.subject.toLowerCase() === subject.toLowerCase() && p.status === 'active');
-  const pastPapers = papers.filter(p => p.subject.toLowerCase() === subject.toLowerCase() && p.status !== 'active');
+  const activePaper = papers.find(p => 
+    p.subject?.toLowerCase() === subject.toLowerCase() && 
+    (p.status || '').toString().trim().toLowerCase() === 'active'
+  );
+  const pastPapers = papers.filter(p => 
+    p.subject?.toLowerCase() === subject.toLowerCase() && 
+    (p.status || '').toString().trim().toLowerCase() !== 'active'
+  );
 
   const hasSubmittedActive = activePaper
     ? studentSubmissions.some(s => s.paper_id === activePaper.id)

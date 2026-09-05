@@ -335,7 +335,10 @@ export const api = {
         : null;
       const currentGrade = avgScore !== null ? calculateGrade(avgScore) : 'N/A';
       
-      const activePaper = papers.find(p => p.subject.toLowerCase() === sub.toLowerCase() && p.status === 'active');
+      const activePaper = papers.find(p => 
+        p.subject?.toLowerCase() === sub.toLowerCase() && 
+        (p.status || '').toString().trim().toLowerCase() === 'active'
+      );
       const hasSubmittedActive = activePaper 
         ? studentSubmissions.some(s => s.paper_id === activePaper.id)
         : false;
@@ -462,48 +465,52 @@ export const api = {
     };
   },
 
-  async getAdminPortalData(adminUser) {
+  async syncPortalData() {
     const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
+    if (!isLive) return null;
 
-    // If Live Mode is ON, fetch fresh data from Google Sheet and cache locally
-    if (config.isLiveMode && config.apiUrl) {
-      try {
-        const response = await fetch(config.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'getPortalData' })
+    try {
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'getPortalData' })
+      });
+      const result = await response.json();
+      if (result.success) {
+        // Cache all fresh sheet data to localStorage (preserve passwords already saved locally)
+        const localStudents = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
+        const mergedStudents = (result.students || []).map(sheetS => {
+          const local = localStudents.find(l => l.index_no === sheetS.index_no);
+          return { ...sheetS, password: sheetS.password || local?.password || '' };
         });
-        const result = await response.json();
-        if (result.success) {
-          // Cache all fresh sheet data to localStorage (preserve passwords already saved locally)
-          const localStudents = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-          const mergedStudents = result.students.map(sheetS => {
-            const local = localStudents.find(l => l.index_no === sheetS.index_no);
-            return { ...sheetS, password: sheetS.password || local?.password || '' };
-          });
-          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(mergedStudents));
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(mergedStudents));
 
-          const localAdmins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-          const mergedAdmins = result.admins.map(sheetA => {
-            const local = localAdmins.find(l => l.admin_id === sheetA.admin_id || l.email === sheetA.email);
-            return { ...sheetA, password: sheetA.password || local?.password || '' };
-          });
-          // Always ensure owner exists in merged admins
-          const ownerExists = mergedAdmins.some(a => a.role === 'owner');
-          if (!ownerExists) {
-            const localOwner = localAdmins.find(a => a.role === 'owner');
-            if (localOwner) mergedAdmins.unshift(localOwner);
-          }
-          localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(mergedAdmins));
-
-          localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(result.papers));
-          localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(result.marks));
-          localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(result.submissions));
+        const localAdmins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
+        const mergedAdmins = (result.admins || []).map(sheetA => {
+          const local = localAdmins.find(l => l.admin_id === sheetA.admin_id || l.email === sheetA.email);
+          return { ...sheetA, password: sheetA.password || local?.password || '' };
+        });
+        const ownerExists = mergedAdmins.some(a => a.role === 'owner');
+        if (!ownerExists) {
+          const localOwner = localAdmins.find(a => a.role === 'owner');
+          if (localOwner) mergedAdmins.unshift(localOwner);
         }
-      } catch (err) {
-        console.warn('Failed to sync from Sheet, using local cache:', err);
+        localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(mergedAdmins));
+
+        localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(result.papers || []));
+        localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(result.marks || []));
+        localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(result.submissions || []));
+        return result;
       }
+    } catch (err) {
+      console.warn('Failed to sync from Sheet, using local cache:', err);
     }
+    return null;
+  },
+
+  async getAdminPortalData(adminUser) {
+    await this.syncPortalData();
 
     // Read from localStorage (freshly synced or cached)
     const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
@@ -527,26 +534,33 @@ export const api = {
 
   async savePaper(paperData) {
     const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
     const papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
 
     let finalPdfUrl = paperData.pdf_url || '';
+    let serverPaperId = paperData.id;
 
-    if (paperData.fileDataUrl && config.isLiveMode && config.apiUrl) {
+    if (isLive) {
       try {
+        const payload = {
+          action: 'savePaper',
+          ...paperData,
+          questionPapersFolderId: config.questionPapersFolderId
+        };
+        if (paperData.fileDataUrl) {
+          payload.fileBase64 = paperData.fileDataUrl.split(',')[1];
+          payload.fileName = `${paperData.subject}_${paperData.paper_name.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+        }
+
         const response = await fetch(config.apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'savePaper',
-            ...paperData,
-            fileBase64: paperData.fileDataUrl.split(',')[1],
-            fileName: `${paperData.subject}_${paperData.paper_name.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`,
-            questionPapersFolderId: config.questionPapersFolderId
-          })
+          body: JSON.stringify(payload)
         });
         const res = await response.json();
-        if (res.success && res.drive_url) {
-          finalPdfUrl = res.drive_url;
+        if (res.success) {
+          if (res.drive_url) finalPdfUrl = res.drive_url;
+          if (res.paper_id) serverPaperId = res.paper_id;
         }
       } catch (err) {
         console.warn('Live paper upload failed:', err);
@@ -560,17 +574,15 @@ export const api = {
     const newPaperRecord = {
       ...paperData,
       pdf_url: finalPdfUrl,
-      id: paperData.id || `${paperData.subject.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+      id: serverPaperId || paperData.id || `${paperData.subject.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`,
+      status: (paperData.status || 'active').toLowerCase(),
       created_at: paperData.created_at || new Date().toISOString().split('T')[0]
     };
 
-    if (paperData.id) {
-      const idx = papers.findIndex(p => p.id === paperData.id);
-      if (idx >= 0) {
-        papers[idx] = newPaperRecord;
-      } else {
-        papers.unshift(newPaperRecord);
-      }
+    const targetId = newPaperRecord.id;
+    const idx = papers.findIndex(p => p.id === targetId);
+    if (idx >= 0) {
+      papers[idx] = newPaperRecord;
     } else {
       papers.unshift(newPaperRecord);
     }
@@ -579,16 +591,72 @@ export const api = {
     return { success: true, paper: newPaperRecord };
   },
 
-  deletePaper(paperId) {
+  async deletePaper(paperId) {
+    const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
+
+    if (isLive) {
+      try {
+        await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'deletePaper',
+            id: paperId
+          })
+        });
+      } catch (err) {
+        console.warn('Live delete paper failed:', err);
+      }
+    }
+
     let papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
     papers = papers.filter(p => p.id !== paperId);
     localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(papers));
     return { success: true, papers };
   },
 
-  saveMark({ index_no, student_name, subject, paper_id, paper_name, score, marked_paper_url, feedback }) {
+  async saveMark({ index_no, student_name, subject, paper_id, paper_name, score, marked_paper_url, feedback }) {
+    const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
     const marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
     const grade = calculateGrade(score);
+
+    let finalMarkedUrl = marked_paper_url || '';
+
+    if (isLive) {
+      try {
+        const payload = {
+          action: 'saveMark',
+          index_no,
+          student_name,
+          subject,
+          paper_id,
+          paper_name,
+          score: Number(score),
+          feedback: feedback || '',
+          markedPapersFolderId: config.markedPapersFolderId
+        };
+        if (marked_paper_url && marked_paper_url.startsWith('data:')) {
+          payload.fileBase64 = marked_paper_url.split(',')[1];
+          payload.fileName = `Marked_${subject}_${paper_id}_${index_no}.pdf`;
+        } else if (marked_paper_url) {
+          payload.marked_paper_url = marked_paper_url;
+        }
+
+        const response = await fetch(config.apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const res = await response.json();
+        if (res.success && res.marked_paper_url) {
+          finalMarkedUrl = res.marked_paper_url;
+        }
+      } catch (err) {
+        console.warn('Live mark save failed:', err);
+      }
+    }
 
     const markRecord = {
       id: `M-${Date.now().toString().slice(-5)}`,
@@ -599,7 +667,7 @@ export const api = {
       paper_name,
       score: Number(score),
       grade,
-      marked_paper_url: marked_paper_url || '',
+      marked_paper_url: finalMarkedUrl,
       feedback: feedback || '',
       evaluated_at: new Date().toISOString().split('T')[0]
     };

@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
     const user = api.getCurrentUser();
     if (user) {
       setCurrentUser(user);
+      api.syncPortalData();
     }
     setLoading(false);
   }, []);
@@ -20,6 +21,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.login({ identifier, password, role });
     if (res.success && res.user) {
       setCurrentUser(res.user);
+      api.syncPortalData();
       return res.user;
     }
     throw new Error(res.error || 'Login failed');
@@ -29,6 +31,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.registerStudent({ name, email, password, phone, batch });
     if (res.success && res.user) {
       setCurrentUser(res.user);
+      api.syncPortalData();
       return res;
     }
     throw new Error(res.error || 'Registration failed');

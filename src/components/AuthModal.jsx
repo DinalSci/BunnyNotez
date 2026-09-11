@@ -187,7 +187,7 @@ export const AuthModal = () => {
                     <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                     <input
                       type="text"
-                      placeholder="e.g. Kasun Perera"
+                      placeholder="e.g. Pubudu Dinal"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -215,12 +215,12 @@ export const AuthModal = () => {
                 {/* Phone & Batch Grid (2027 A/L to 2029 A/L) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">WhatsApp No</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Telegram Username</label>
                     <div className="relative">
                       <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                       <input
                         type="tel"
-                        placeholder="0771234567"
+                        placeholder="@bunnyy"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         className="w-full pl-9 pr-3 py-2.5 rounded-2xl glass-input text-sm text-slate-800 placeholder-slate-400"

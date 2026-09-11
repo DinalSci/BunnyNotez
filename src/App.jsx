@@ -50,9 +50,9 @@ const MainLayout = () => {
             <span>• Biology, Chemistry & Physics Paper Portal</span>
           </div>
           <div className="flex items-center space-x-1">
-            <span>Powered by Google Sheets & Apps Script</span>
+            
             <span>•</span>
-            <span className="font-semibold text-emerald-700">2026 A/L Batch</span>
+            <span className="font-semibold text-emerald-700">2027 A/L Batch</span>
           </div>
         </div>
       </footer>

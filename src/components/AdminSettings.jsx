@@ -414,7 +414,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
               <input
                 type="email"
-                placeholder="danushka.bio@bunnynotes.com"
+                placeholder="dinal@bunnynotes.com"
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
                 required
@@ -562,7 +562,7 @@ export const AdminSettings = ({ admins, onRefresh }) => {
           <div>
             <h3 className="text-base font-bold text-rose-900">Danger Zone — Factory Reset</h3>
             <p className="text-xs text-rose-600 mt-0.5">
-              සිසු accounts, admin accounts, papers, marks, submissions ඔක්කොම erase කරනවා. Config (Drive, Telegram) preserved.
+              accounts, admin accounts, papers, marks, submissions ඔක්කොම erase කරනවා. Config (Drive, Telegram) preserved.
             </p>
           </div>
         </div>

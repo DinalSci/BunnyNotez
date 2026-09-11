@@ -174,7 +174,7 @@ export const AdminPapersManager = ({ papers, currentAdmin, onRefresh }) => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Paper Title / Name</label>
                 <input
                   type="text"
-                  placeholder="e.g. Model Paper 01 - Plant Physiology"
+                  placeholder="e.g. Model Paper 01"
                   value={paperName}
                   onChange={(e) => setPaperName(e.target.value)}
                   required

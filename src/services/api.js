@@ -7,6 +7,14 @@ import {
   calculateGrade
 } from '../data/mockData';
 
+// ========================================================================
+// 🔗 GOOGLE APPS SCRIPT WEB APP URL
+// ========================================================================
+// Paste your deployed Google Apps Script Web App URL below between the quotes.
+// Example: 'https://script.google.com/macros/s/AKfycb.../exec'
+// When this URL is set, the entire app connects directly to Google Sheets & Drive!
+export const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-m6atKc8Y7gPXLh7iw5WVGIvhF_vwtxUwB7JVR64jTR9oXjawDTh16DXMgKqDfHHc6Q/exec';
+
 const STORAGE_KEYS = {
   STUDENTS: 'bn_students',
   ADMINS: 'bn_admins',
@@ -18,11 +26,12 @@ const STORAGE_KEYS = {
 };
 
 export const initializeStorage = () => {
+  // Never initialize mock students with passwords into localStorage
   if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(INITIAL_STUDENTS));
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
   }
   
-  // Ensure default admins (including owner) exist in storage
+  // Ensure default owner account entry exists for emergency login
   let currentAdmins = [];
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.ADMINS);
@@ -41,26 +50,31 @@ export const initializeStorage = () => {
     !DEMO_ACCOUNTS_TO_REMOVE.includes(a.email.toLowerCase())
   );
 
-  // Ensure owner account always exists
-  INITIAL_ADMINS.forEach(initAdm => {
-    const exists = currentAdmins.some(a => 
-      a.email.toLowerCase() === initAdm.email.toLowerCase() || 
-      a.admin_id.toLowerCase() === initAdm.admin_id.toLowerCase()
-    );
-    if (!exists) {
-      currentAdmins.push(initAdm);
-    }
-  });
+  // Keep owner account in local list (without password)
+  const ownerEntry = {
+    admin_id: 'OWN001',
+    name: 'Bunny Notes Owner',
+    email: 'owner@bunnynotes.com',
+    role: 'owner',
+    subject: 'All'
+  };
+  const exists = currentAdmins.some(a => 
+    a.email.toLowerCase() === ownerEntry.email.toLowerCase() || 
+    a.admin_id.toLowerCase() === ownerEntry.admin_id.toLowerCase()
+  );
+  if (!exists) {
+    currentAdmins.unshift(ownerEntry);
+  }
   localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(currentAdmins));
 
   if (!localStorage.getItem(STORAGE_KEYS.PAPERS)) {
-    localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(INITIAL_PAPERS));
+    localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.MARKS)) {
-    localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(INITIAL_MARKS));
+    localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.SUBMISSIONS)) {
-    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(INITIAL_SUBMISSIONS));
+    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.CONFIG)) {
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify({
@@ -84,7 +98,7 @@ export const initializeStorage = () => {
  * Only the Owner account is kept. All students, admins, papers, marks, submissions are cleared.
  */
 export const factoryReset = () => {
-  // Preserve existing cloud config so owner doesn't have to re-enter it
+  // Preserve existing cloud config
   const savedConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
 
   // Wipe all keys
@@ -95,9 +109,17 @@ export const factoryReset = () => {
     localStorage.setItem(STORAGE_KEYS.CONFIG, savedConfig);
   }
 
-  // Re-init: only owner account, empty everything else
+  // Re-init: empty everything, owner only
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
-  localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(INITIAL_ADMINS)); // owner only
+  localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify([
+    {
+      admin_id: 'OWN001',
+      name: 'Bunny Notes Owner',
+      email: 'owner@bunnynotes.com',
+      role: 'owner',
+      subject: 'All'
+    }
+  ]));
   localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify([]));
   localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify([]));
@@ -105,6 +127,10 @@ export const factoryReset = () => {
 
 export const getConfig = () => {
   const envUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL || '';
+  const hardcodedUrl = (APPS_SCRIPT_URL && APPS_SCRIPT_URL.trim() && !APPS_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID'))
+    ? APPS_SCRIPT_URL.trim()
+    : '';
+
   const envTgToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
   const envBioChat = import.meta.env.VITE_TELEGRAM_BIO_CHAT_ID || '';
   const envChemChat = import.meta.env.VITE_TELEGRAM_CHEM_CHAT_ID || '';
@@ -115,8 +141,12 @@ export const getConfig = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const parsed = raw ? JSON.parse(raw) : {};
+
+    // URL precedence: hardcoded URL in api.js > localStorage.apiUrl > envUrl
+    const effectiveUrl = hardcodedUrl || (parsed.apiUrl ? parsed.apiUrl.trim() : '') || envUrl;
+
     return {
-      apiUrl: parsed.apiUrl || envUrl,
+      apiUrl: effectiveUrl,
       telegramBotToken: parsed.telegramBotToken || envTgToken,
       telegramBioChatId: parsed.telegramBioChatId || envBioChat,
       telegramChemChatId: parsed.telegramChemChatId || envChemChat,
@@ -124,12 +154,13 @@ export const getConfig = () => {
       submissionsFolderId: parsed.submissionsFolderId || envSubFolder,
       questionPapersFolderId: parsed.questionPapersFolderId || envQuesFolder,
       markedPapersFolderId: parsed.markedPapersFolderId || '',
-      isLiveMode: parsed.isLiveMode !== undefined ? parsed.isLiveMode : Boolean(parsed.apiUrl || envUrl),
+      isLiveMode: effectiveUrl ? true : (parsed.isLiveMode !== undefined ? parsed.isLiveMode : false),
       autoTelegramAlerts: parsed.autoTelegramAlerts !== undefined ? parsed.autoTelegramAlerts : true
     };
   } catch {
+    const effectiveUrl = hardcodedUrl || envUrl;
     return {
-      apiUrl: envUrl,
+      apiUrl: effectiveUrl,
       telegramBotToken: envTgToken,
       telegramBioChatId: envBioChat,
       telegramChemChatId: envChemChat,
@@ -137,7 +168,7 @@ export const getConfig = () => {
       submissionsFolderId: envSubFolder,
       questionPapersFolderId: envQuesFolder,
       markedPapersFolderId: '',
-      isLiveMode: Boolean(envUrl),
+      isLiveMode: Boolean(effectiveUrl),
       autoTelegramAlerts: true
     };
   }
@@ -174,68 +205,42 @@ export const api = {
     const config = getConfig();
     const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
 
-    if (isLive) {
-      try {
-        const response = await fetch(config.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'register',
-            name,
-            email,
-            password,
-            phone,
-            batch
-          })
-        });
-        const result = await response.json();
-        if (result.success) {
-          const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-          students.push({ ...result.user, password });
-          localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
-          return result;
-        }
-        throw new Error(result.error || 'Failed to register with Google Sheet backend');
-      } catch (err) {
-        throw new Error(err.message || 'Google Sheet registration failed. Please check network connection.');
+    if (!isLive) {
+      throw new Error('Google Apps Script URL is not configured. Please paste your Web App URL into APPS_SCRIPT_URL in src/services/api.js to enable live registration.');
+    }
+
+    try {
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'register',
+          name: name.trim(),
+          email: email.trim(),
+          password: password.trim(),
+          phone: (phone || '').trim(),
+          batch
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        // Safe: Do NOT store student password in localStorage!
+        // Sync portal data so client has updated state
+        await this.syncPortalData();
+        return result;
       }
+      throw new Error(result.error || 'Failed to register student in Google Sheet.');
+    } catch (err) {
+      throw new Error(err.message || 'Google Sheet registration failed. Please check network connection.');
     }
-
-    const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-    const existing = students.find(s => s.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      throw new Error('An account with this email address already exists.');
-    }
-
-    const index_no = getNextIndexNumber();
-    const newStudent = {
-      index_no,
-      name,
-      email,
-      password,
-      role: 'student',
-      phone: phone || '',
-      batch,
-      joined_date: new Date().toISOString().split('T')[0]
-    };
-
-    students.push(newStudent);
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
-
-    return {
-      success: true,
-      index_no,
-      user: newStudent,
-      message: `Account created successfully! Your Student Index is ${index_no}`
-    };
   },
 
   async login({ identifier, password, role }) {
     const config = getConfig();
-    const cleanId = identifier.trim().toLowerCase();
-    const cleanPass = password.trim();
+    const cleanId = (identifier || '').trim().toLowerCase();
+    const cleanPass = (password || '').trim();
 
-    // Built-in Owner direct fallback check (always guaranteed to work for initial setup)
+    // Built-in Owner emergency access (guaranteed to work for setup)
     if (
       (cleanId === 'owner@bunnynotes.com' || cleanId === 'owner' || cleanId === 'own001') && 
       cleanPass === 'owner123'
@@ -251,55 +256,42 @@ export const api = {
       return { success: true, user: ownerUser };
     }
 
-    // Live Mode Check: Strict Google Sheet Authentication
+    // Live Mode: Strict Google Sheet Authentication
     const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
-    if (isLive) {
-      try {
-        const response = await fetch(config.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'login',
-            identifier: cleanId,
-            password: cleanPass,
-            role
-          })
-        });
-        const result = await response.json();
-        if (result.success) {
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(result.user));
-          return result;
-        }
-        throw new Error(result.error || 'Invalid credentials in Google Sheet.');
-      } catch (err) {
-        throw new Error(err.message || 'Failed to authenticate with Google Sheet.');
-      }
+    if (!isLive) {
+      throw new Error('Google Apps Script Web App URL is not set. Please paste your URL into APPS_SCRIPT_URL in src/services/api.js.');
     }
 
-    // Offline / Local Storage Mode (Only when Live Mode is disabled)
-    if (role === 'admin' || role === 'owner') {
-      const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-      const admin = admins.find(a => 
-        (a.email.toLowerCase() === cleanId || a.admin_id.toLowerCase() === cleanId) && 
-        a.password === cleanPass
-      );
-      if (!admin) {
-        throw new Error('Invalid Admin / Owner email or password.');
+    try {
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'login',
+          identifier: cleanId,
+          password: cleanPass,
+          role
+        })
+      });
+      const result = await response.json();
+      if (result.success && result.user) {
+        // Store ONLY active user session info (NEVER store password in localStorage)
+        const sessionUser = {
+          index_no: result.user.index_no,
+          admin_id: result.user.admin_id,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role || (role === 'admin' ? 'admin' : 'student'),
+          subject: result.user.subject || 'All',
+          phone: result.user.phone || '',
+          batch: result.user.batch || '2027 A/L'
+        };
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(sessionUser));
+        return { success: true, user: sessionUser };
       }
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(admin));
-      return { success: true, user: admin };
-    } else {
-      const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-      const student = students.find(s => 
-        (s.email.toLowerCase() === cleanId || s.index_no.toLowerCase() === cleanId) && 
-        s.password === cleanPass
-      );
-      if (!student) {
-        throw new Error('Invalid Student Index Number / Email or password.');
-      }
-      const user = { ...student, role: 'student' };
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-      return { success: true, user };
+      throw new Error(result.error || 'Invalid credentials in Google Sheet.');
+    } catch (err) {
+      throw new Error(err.message || 'Failed to authenticate with Google Sheet.');
     }
   },
 
@@ -365,6 +357,7 @@ export const api = {
   // Submit Answer Paper -> Sends to dedicated subject Telegram group and custom folder ID
   async submitAnswerPaper({ index_no, student_name, subject, paper_id, paper_name, file, fileDataUrl }) {
     const config = getConfig();
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
 
     const cleanPaperName = paper_name.replace(/[^a-zA-Z0-9_-]/g, '_');
     const formattedFileName = `${subject}_${cleanPaperName}_${index_no}.pdf`;
@@ -380,21 +373,13 @@ export const api = {
       submitted_at: new Date().toLocaleString(),
       status: 'Pending Marking',
       file_size: file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : '3.2 MB',
-      drive_url: fileDataUrl || 'https://drive.google.com/sample_submission.pdf'
+      drive_url: '' // Will be updated with real Drive URL from Google Apps Script
     };
-
-    const submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
-    const existingIndex = submissions.findIndex(s => s.index_no === index_no && s.paper_id === paper_id);
-    if (existingIndex >= 0) {
-      submissions[existingIndex] = submissionRecord;
-    } else {
-      submissions.unshift(submissionRecord);
-    }
-    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(submissions));
 
     let liveUploadSuccess = false;
     let liveDriveUrl = '';
-    if (config.isLiveMode && config.apiUrl) {
+
+    if (isLive) {
       try {
         const response = await fetch(config.apiUrl, {
           method: 'POST',
@@ -402,7 +387,7 @@ export const api = {
           body: JSON.stringify({
             action: 'uploadAnswerPaper',
             submission: submissionRecord,
-            fileBase64: fileDataUrl ? fileDataUrl.split(',')[1] : null,
+            fileBase64: fileDataUrl ? (fileDataUrl.includes(',') ? fileDataUrl.split(',')[1] : fileDataUrl) : null,
             fileName: formattedFileName,
             subject: subject,
             submissionsFolderId: config.submissionsFolderId
@@ -411,12 +396,26 @@ export const api = {
         const resJson = await response.json();
         if (resJson.success) {
           liveUploadSuccess = true;
-          liveDriveUrl = resJson.drive_url;
+          liveDriveUrl = resJson.drive_url || '';
+          submissionRecord.drive_url = liveDriveUrl;
+        } else {
+          throw new Error(resJson.error || 'Failed to upload answer paper to Google Drive');
         }
       } catch (err) {
         console.warn('Apps Script upload error:', err);
+        throw err;
       }
     }
+
+    // Save only lightweight metadata to localStorage (NEVER save base64 data URLs)
+    const submissions = JSON.parse(localStorage.getItem(STORAGE_KEYS.SUBMISSIONS) || '[]');
+    const existingIndex = submissions.findIndex(s => s.index_no === index_no && s.paper_id === paper_id);
+    if (existingIndex >= 0) {
+      submissions[existingIndex] = submissionRecord;
+    } else {
+      submissions.unshift(submissionRecord);
+    }
+    localStorage.setItem(STORAGE_KEYS.SUBMISSIONS, JSON.stringify(submissions));
 
     let targetChatId = '';
     const subLower = subject.toLowerCase();
@@ -478,25 +477,29 @@ export const api = {
       });
       const result = await response.json();
       if (result.success) {
-        // Cache all fresh sheet data to localStorage (preserve passwords already saved locally)
-        const localStudents = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
-        const mergedStudents = (result.students || []).map(sheetS => {
-          const local = localStudents.find(l => l.index_no === sheetS.index_no);
-          return { ...sheetS, password: sheetS.password || local?.password || '' };
+        // Cache data to localStorage WITHOUT ANY PASSWORDS
+        const cleanStudents = (result.students || []).map(s => {
+          const { password, ...rest } = s;
+          return rest;
         });
-        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(mergedStudents));
+        localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(cleanStudents));
 
-        const localAdmins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-        const mergedAdmins = (result.admins || []).map(sheetA => {
-          const local = localAdmins.find(l => l.admin_id === sheetA.admin_id || l.email === sheetA.email);
-          return { ...sheetA, password: sheetA.password || local?.password || '' };
+        const cleanAdmins = (result.admins || []).map(a => {
+          const { password, ...rest } = a;
+          return rest;
         });
-        const ownerExists = mergedAdmins.some(a => a.role === 'owner');
+        // Ensure owner exists in admin list
+        const ownerExists = cleanAdmins.some(a => a.role === 'owner');
         if (!ownerExists) {
-          const localOwner = localAdmins.find(a => a.role === 'owner');
-          if (localOwner) mergedAdmins.unshift(localOwner);
+          cleanAdmins.unshift({
+            admin_id: 'OWN001',
+            name: 'Bunny Notes Owner',
+            email: 'owner@bunnynotes.com',
+            role: 'owner',
+            subject: 'All'
+          });
         }
-        localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(mergedAdmins));
+        localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(cleanAdmins));
 
         localStorage.setItem(STORAGE_KEYS.PAPERS, JSON.stringify(result.papers || []));
         localStorage.setItem(STORAGE_KEYS.MARKS, JSON.stringify(result.marks || []));
@@ -512,7 +515,7 @@ export const api = {
   async getAdminPortalData(adminUser) {
     await this.syncPortalData();
 
-    // Read from localStorage (freshly synced or cached)
+    // Read from localStorage (freshly synced)
     const students = JSON.parse(localStorage.getItem(STORAGE_KEYS.STUDENTS) || '[]');
     const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
     let papers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PAPERS) || '[]');
@@ -548,8 +551,8 @@ export const api = {
           ...restPaperData,
           questionPapersFolderId: config.questionPapersFolderId
         };
-        if (fileDataUrl && fileDataUrl.includes(',')) {
-          payload.fileBase64 = fileDataUrl.split(',')[1];
+        if (fileDataUrl) {
+          payload.fileBase64 = fileDataUrl.includes(',') ? fileDataUrl.split(',')[1] : fileDataUrl;
           payload.fileName = `${paperData.subject}_${paperData.paper_name.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
         }
 
@@ -560,7 +563,7 @@ export const api = {
         });
         const res = await response.json();
         if (res.success) {
-          if (res.drive_url) finalPdfUrl = res.drive_url;
+          if (res.drive_url || res.pdf_url) finalPdfUrl = res.drive_url || res.pdf_url;
           if (res.paper_id) serverPaperId = res.paper_id;
         } else {
           throw new Error(res.error || 'Failed to save paper to Google Sheet.');
@@ -571,10 +574,7 @@ export const api = {
       }
     }
 
-    if (!finalPdfUrl && paperData.fileDataUrl) {
-      finalPdfUrl = paperData.fileDataUrl;
-    }
-
+    // Notice: NEVER save fileDataUrl to localStorage (prevents quota crash)
     const newPaperRecord = {
       ...paperData,
       pdf_url: finalPdfUrl,
@@ -582,6 +582,7 @@ export const api = {
       status: (paperData.status || 'active').toLowerCase(),
       created_at: paperData.created_at || new Date().toISOString().split('T')[0]
     };
+    delete newPaperRecord.fileDataUrl;
 
     const targetId = newPaperRecord.id;
     const idx = papers.findIndex(p => p.id === targetId);
@@ -626,7 +627,7 @@ export const api = {
     const marks = JSON.parse(localStorage.getItem(STORAGE_KEYS.MARKS) || '[]');
     const grade = calculateGrade(score);
 
-    let finalMarkedUrl = marked_paper_url || '';
+    let finalMarkedUrl = (marked_paper_url && !marked_paper_url.startsWith('data:')) ? marked_paper_url : '';
 
     if (isLive) {
       try {
@@ -696,52 +697,34 @@ export const api = {
 
   async createAdmin({ name, email, password, subject = 'Biology' }) {
     const config = getConfig();
-    if (config.isLiveMode && config.apiUrl) {
-      try {
-        const response = await fetch(config.apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({
-            action: 'createAdmin',
-            name,
-            email,
-            password,
-            subject
-          })
-        });
-        const result = await response.json();
-        if (result.success) {
-          // Sync with local storage
-          const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-          admins.push({ ...result.admin, password });
-          localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(admins));
-          return result;
-        }
-        throw new Error(`SERVER_ERROR:${result.error || 'Failed to create admin'}`);
-      } catch (err) {
-        if (err.message.startsWith('SERVER_ERROR:')) throw new Error(err.message.replace('SERVER_ERROR:', ''));
-        console.warn('Live API createAdmin failed, trying local store:', err);
-        throw err; // In live mode, we want to know if sheet save fails
+    const isLive = Boolean(config.apiUrl) && config.isLiveMode !== false;
+
+    if (isLive) {
+      const response = await fetch(config.apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'createAdmin',
+          name: name.trim(),
+          email: email.trim(),
+          password: password.trim(),
+          subject
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        // Safe: Do NOT store admin password in localStorage!
+        const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
+        const cleanAdmin = { ...result.admin };
+        delete cleanAdmin.password;
+        admins.push(cleanAdmin);
+        localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(admins));
+        return result;
       }
+      throw new Error(result.error || 'Failed to create admin in Google Sheet.');
     }
 
-    // Local Storage Fallback
-    const admins = JSON.parse(localStorage.getItem(STORAGE_KEYS.ADMINS) || '[]');
-    const existing = admins.find(a => a.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      throw new Error('An admin with this email already exists.');
-    }
-    const newAdmin = {
-      admin_id: `ADM${String(admins.length + 1).padStart(3, '0')}`,
-      name,
-      email,
-      password,
-      role: subject === 'All' ? 'super_admin' : 'admin',
-      subject
-    };
-    admins.push(newAdmin);
-    localStorage.setItem(STORAGE_KEYS.ADMINS, JSON.stringify(admins));
-    return { success: true, admin: newAdmin };
+    throw new Error('Google Apps Script URL is required to create Admin accounts.');
   },
 
   async testTelegramGroup(botToken, chatId, subjectName = 'General') {
